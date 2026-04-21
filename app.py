@@ -1,0 +1,548 @@
+import streamlit as st
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import GradientBoostingClassifier
+from datetime import datetime, timedelta
+import random
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+# Twilio — install via: pip install twilio
+try:
+    from twilio.rest import Client as TwilioClient
+    TWILIO_AVAILABLE = True
+except ImportError:
+    TWILIO_AVAILABLE = False
+
+st.set_page_config(page_title="Indosat CRM AI", page_icon="📡", layout="wide")
+
+# ── Sidebar Credentials ───────────────────────────────────────────────────────
+import os
+
+# Load from Streamlit Cloud secrets OR Replit env vars, fallback to sidebar input
+def _get_secret(key, default=""):
+    # Try Streamlit Cloud secrets first
+    try:
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    # Fallback to Replit / local env vars
+    return os.environ.get(key, default)
+
+_GMAIL_ADDRESS   = _get_secret("GMAIL_ADDRESS", "agung.technology.management@gmail.com")
+_GMAIL_APP_PASS  = _get_secret("GMAIL_APP_PASSWORD", "")
+_TWILIO_SID      = _get_secret("TWILIO_SID", "")
+_TWILIO_TOKEN    = _get_secret("TWILIO_TOKEN", "")
+_TWILIO_WA_FROM  = _get_secret("TWILIO_WA_FROM", "whatsapp:+14155238886")
+
+with st.sidebar:
+    st.title("⚙️ API Configuration")
+    st.markdown("---")
+
+    if _GMAIL_APP_PASS:
+        st.success("✅ Gmail credentials loaded from Secrets")
+    else:
+        st.warning("⚠️ Gmail App Password not found in Secrets")
+
+    if _TWILIO_SID and _TWILIO_TOKEN:
+        st.success("✅ Twilio credentials loaded from Secrets")
+    else:
+        st.warning("⚠️ Twilio credentials not found in Secrets")
+
+    st.markdown("---")
+    st.markdown("### 📧 Gmail SMTP (override)")
+    sender_email   = st.text_input("Your Gmail", value=_GMAIL_ADDRESS)
+    gmail_app_pass = st.text_input("Gmail App Password", value=_GMAIL_APP_PASS, type="password", placeholder="Leave blank if using Secrets")
+
+    st.markdown("---")
+    st.markdown("### 💬 Twilio WhatsApp (override)")
+    twilio_sid     = st.text_input("Twilio Account SID", value=_TWILIO_SID, type="password")
+    twilio_token   = st.text_input("Twilio Auth Token", value=_TWILIO_TOKEN, type="password")
+    twilio_wa_from = st.text_input("Twilio WhatsApp Number", value=_TWILIO_WA_FROM)
+
+    st.markdown("---")
+    st.caption("Credentials load automatically from Streamlit Cloud Secrets or Replit Secrets. Sidebar fields are for manual override only.")
+
+# ── Send functions ────────────────────────────────────────────────────────────
+def send_email(to_email, subject, body, sender, app_password):
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = sender
+        msg["To"]      = to_email
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(sender, app_password)
+            server.sendmail(sender, to_email, msg.as_string())
+        return True, "Email sent successfully."
+    except Exception as e:
+        return False, str(e)
+
+def send_whatsapp(to_number, message, sid, token, from_number):
+    if not TWILIO_AVAILABLE:
+        return False, "Twilio library not installed. Run: pip install twilio"
+    try:
+        client = TwilioClient(sid, token)
+        wa_to  = f"whatsapp:{to_number}" if not to_number.startswith("whatsapp:") else to_number
+        client.messages.create(body=message, from_=from_number, to=wa_to)
+        return True, "WhatsApp message sent successfully."
+    except Exception as e:
+        return False, str(e)
+
+# ── Synthetic customer database ───────────────────────────────────────────────
+@st.cache_resource
+def generate_customers():
+    random.seed(42); np.random.seed(42)
+    customers = [
+        {"name":"Budi Santoso",   "email":"budi.santoso@gmail.com",    "whatsapp":"+6281234560001","plan_type":"Postpaid"},
+        {"name":"Siti Rahayu",    "email":"siti.rahayu@yahoo.com",     "whatsapp":"+6281234560002","plan_type":"Prepaid"},
+        {"name":"Ahmad Fauzi",    "email":"ahmad.fauzi@gmail.com",     "whatsapp":"+6281234560003","plan_type":"Postpaid"},
+        {"name":"Dewi Lestari",   "email":"dewi.lestari@outlook.com",  "whatsapp":"+6281234560004","plan_type":"Postpaid"},
+        {"name":"Rizky Pratama",  "email":"rizky.pratama@gmail.com",   "whatsapp":"+6281234560005","plan_type":"Prepaid"},
+        {"name":"Nurul Hidayah",  "email":"nurul.hidayah@gmail.com",   "whatsapp":"+6281234560006","plan_type":"Postpaid"},
+        {"name":"Andi Wijaya",    "email":"andi.wijaya@gmail.com",     "whatsapp":"+6281234560007","plan_type":"Prepaid"},
+        {"name":"Fitri Handayani","email":"fitri.handayani@yahoo.com", "whatsapp":"+6281234560008","plan_type":"Postpaid"},
+        {"name":"Deni Kurniawan", "email":"deni.kurniawan@gmail.com",  "whatsapp":"+6281234560009","plan_type":"Prepaid"},
+        {"name":"Maya Putri",     "email":"maya.putri@outlook.com",    "whatsapp":"+6281234560010","plan_type":"Postpaid"},
+        {"name":"Hendra Gunawan", "email":"hendra.gunawan@gmail.com",  "whatsapp":"+6281234560011","plan_type":"Postpaid"},
+        {"name":"Rina Susanti",   "email":"rina.susanti@gmail.com",    "whatsapp":"+6281234560012","plan_type":"Prepaid"},
+        {"name":"Fajar Setiawan", "email":"fajar.setiawan@gmail.com",  "whatsapp":"+6281234560013","plan_type":"Postpaid"},
+        {"name":"Lina Marlina",   "email":"lina.marlina@yahoo.com",    "whatsapp":"+6281234560014","plan_type":"Prepaid"},
+        {"name":"Bagas Prabowo",  "email":"bagas.prabowo@gmail.com",   "whatsapp":"+6281234560015","plan_type":"Postpaid"},
+        {"name":"Indah Permata",  "email":"indah.permata@outlook.com", "whatsapp":"+6281234560016","plan_type":"Prepaid"},
+        {"name":"Roni Saputra",   "email":"roni.saputra@gmail.com",    "whatsapp":"+6281234560017","plan_type":"Postpaid"},
+        {"name":"Wulan Sari",     "email":"wulan.sari@gmail.com",      "whatsapp":"+6281234560018","plan_type":"Prepaid"},
+        {"name":"Agus Hartono",   "email":"agus.hartono@gmail.com",    "whatsapp":"+6281234560019","plan_type":"Postpaid"},
+        {"name":"Citra Dewi",     "email":"citra.dewi@yahoo.com",      "whatsapp":"+6281234560020","plan_type":"Postpaid"},
+    ]
+    plans_post = ["Postpaid Freedom 50","Postpaid Business Pro","Postpaid Platinum","Postpaid Family"]
+    plans_pre  = ["Prepaid Freedom","Prepaid Social","Prepaid Gaming","Prepaid Basic"]
+    cities     = ["Jakarta","Surabaya","Bandung","Medan","Semarang","Makassar","Yogyakarta"]
+    rows = []
+    for i, c in enumerate(customers):
+        tenure    = random.randint(5, 720)
+        arpu      = random.randint(50000, 350000) if c["plan_type"]=="Postpaid" else random.randint(8000, 80000)
+        loyalty   = random.randint(0, 3)
+        interest  = random.randint(0, 3)
+        data_drop = random.uniform(0, 90)
+        topup     = random.randint(0, 55)
+        compl     = random.randint(0, 4)
+        netq      = round(random.uniform(1.5, 5.0), 1)
+        phone     = f"0812-{random.randint(1000,9999)}-{random.randint(1000,9999)}"
+        rows.append({
+            "id": f"IOH-{str(i+1).zfill(4)}",
+            "name": c["name"], "email": c["email"],
+            "whatsapp": c["whatsapp"], "phone": phone,
+            "plan_type": c["plan_type"],
+            "plan": random.choice(plans_post if c["plan_type"]=="Postpaid" else plans_pre),
+            "city": random.choice(cities),
+            "tenure": tenure, "arpu": arpu, "loyalty": loyalty,
+            "interest": interest, "data_drop": data_drop,
+            "topup_days": topup, "complaints": compl, "network": netq,
+            "last_active": (datetime.today()-timedelta(days=topup)).strftime("%d %b %Y"),
+        })
+    return pd.DataFrame(rows)
+
+@st.cache_resource
+def train_model():
+    np.random.seed(42); n=3000
+    td=np.random.randint(0,730,n); ar=np.random.randint(5000,350000,n)
+    lo=np.random.randint(0,4,n);   ins=np.random.randint(0,4,n)
+    dd=np.random.uniform(0,100,n); tp=np.random.randint(0,60,n)
+    co=np.random.randint(0,6,n);   nq=np.random.uniform(1,5,n)
+    cp=(0.30*(td<100)+0.20*(ar<20000)+0.15*(lo==0)+0.10*(dd>50)+0.10*(tp>20)+0.10*(co>=2)+0.05*(nq<2.5))
+    ch=(cp+np.random.normal(0,0.05,n)>0.40).astype(int)
+    X=np.column_stack([td,ar,lo,ins,dd,tp,co,nq])
+    m=GradientBoostingClassifier(n_estimators=100,max_depth=4,random_state=42)
+    m.fit(X,ch); return m
+
+df    = generate_customers()
+model = train_model()
+
+LOYALTY       = ["Bronze","Silver","Gold","Platinum"]
+LOYALTY_ICON  = ["🥉","🥈","🥇","💎"]
+INTEREST      = ["Data Streamer","Social Media","Gamer","Business User"]
+INTEREST_ICON = ["📺","📱","🎮","💼"]
+
+def tseg(d):
+    if d<=30:    return "New (0-30d)","🔴"
+    elif d<=100: return "Early (31-100d)","🟠"
+    elif d<=360: return "Growing (101-360d)","🟡"
+    else:        return "Loyal (>360d)","🟢"
+
+def aseg(a):
+    if a<20000:    return "Low (<20k)","🔴"
+    elif a<75000:  return "Mid (20-75k)","🟡"
+    elif a<200000: return "High (75-200k)","🟢"
+    else:          return "Premium (>200k)","🟢"
+
+def get_drivers(row):
+    f=[]
+    if row.tenure<=30:    f.append("Brand new subscriber — still in trial phase")
+    elif row.tenure<=100: f.append("Early subscriber — usage habits not yet formed")
+    if row.arpu<20000:    f.append("Very low ARPU — highly price-sensitive")
+    elif row.arpu<40000:  f.append("Below-average ARPU")
+    if row.loyalty==0:    f.append("Bronze tier — no loyalty rewards engagement yet")
+    if row.data_drop>50:  f.append(f"Data usage dropped {row.data_drop:.0f}% vs last month")
+    if row.topup_days>20: f.append(f"No top-up activity in {row.topup_days} days")
+    if row.complaints>=2: f.append(f"{row.complaints} unresolved complaints on record")
+    if row.network<2.5:   f.append("Poor network quality in subscriber area")
+    return f[:3] if f else ["No significant risk drivers detected"]
+
+def get_offer(interest, plan_type):
+    offers = {
+        0: ("10GB kuota streaming gratis selama 7 hari",    "nikmati YouTube, Netflix, dan Disney+ tanpa buffering"),
+        1: ("akses gratis semua sosial media selama 30 hari","WhatsApp, Instagram, TikTok, dan X tanpa batas"),
+        2: ("Gaming Pack 5GB + prioritas ping rendah",       "main Mobile Legends, PUBG, dan Free Fire tanpa lag"),
+        3: ("upgrade gratis ke paket Business selama 1 bulan","koneksi stabil untuk meeting dan WFH"),
+    }
+    return offers[interest]
+
+def marketer_actions(prob, plan_type, interest, loyalty):
+    actions = []
+    if prob >= 0.70:
+        actions.append("🚨 URGENT: Send retention offer within 24 hours via Email + WhatsApp")
+        actions.append("📞 Schedule personal call from retention team if no response in 48h")
+        actions.append("💰 Offer loyalty discount (10–20% off next bill) as last resort")
+        if plan_type == "Postpaid":
+            actions.append("⭐ Postpaid priority: Escalate to senior retention team — higher LTV customer")
+    elif prob >= 0.40:
+        actions.append("📈 UPSELL: Target with plan upgrade or add-on offer within 3 days")
+        actions.append("🎁 Send loyalty points reward to re-engage the customer")
+        actions.append("📊 Monitor usage weekly — escalate to HIGH RISK if data drop continues")
+        if plan_type == "Postpaid":
+            actions.append("⭐ Postpaid upsell path: push to Platinum or Family Plan tier")
+    else:
+        actions.append("🌟 LOYALTY: Reward with bonus points or exclusive member benefit")
+        actions.append("📣 CROSS-SELL: Offer family plan, device bundle, or add-on service")
+        actions.append("📅 Re-engage quarterly with VIP newsletter or early access to new plans")
+        if plan_type == "Postpaid":
+            actions.append("⭐ Postpaid cross-sell: Introduce Postpaid Family Plan to increase ARPU")
+    return actions
+
+def generate_email_content(row, prob, offer, benefit):
+    first = row["name"].split()[0]
+    today = datetime.today().strftime("%d %B %Y")
+    loyalty_name = LOYALTY[row["loyalty"]]
+    interest_name = INTEREST[row["interest"]]
+    postpaid_line = f"""
+
+Sebagai pelanggan Postpaid kami, {first} mendapatkan prioritas layanan eksklusif yang tidak tersedia untuk pelanggan umum.""" if row["plan_type"]=="Postpaid" else ""
+
+    if prob >= 0.70:
+        subject = f"[Indosat] Hadiah Spesial Untukmu, {first} — Jangan Sampai Terlewat!"
+        body = f"""Kepada Yth.
+{row['name']},
+
+Salam hangat dari Indosat Ooredoo Hutchison.{postpaid_line}
+
+Kami memperhatikan bahwa belakangan ini aktivitas penggunaan layanan kamu mengalami perubahan. Kami sangat menghargai kesetiaan kamu selama {row['tenure']} hari bersama Indosat, dan kami tidak ingin kamu melewatkan penawaran spesial ini.
+
+Sebagai pelanggan {interest_name} yang kami hormati, kami menyiapkan:
+
+✨ PENAWARAN EKSKLUSIF KHUSUS {first.upper()}:
+   ➜ {offer.upper()}
+   ➜ Manfaat: {benefit.capitalize()}.
+
+Penawaran ini hanya berlaku 48 jam dan dibuat khusus untuk kamu.
+
+Cara klaim mudah:
+   1. Buka aplikasi myIM3
+   2. Masuk ke menu "Penawaran Spesial"
+   3. Tap "Klaim Sekarang" — GRATIS, tanpa syarat tambahan
+
+Atau balas email ini dengan kata YA dan tim kami akan memproses klaim kamu langsung.
+
+Kami tidak ingin kehilangan kamu, {first}. Kamu adalah bagian penting dari keluarga Indosat.
+
+Salam hangat,
+Tim Retensi Pelanggan
+Indosat Ooredoo Hutchison
+{today}
+────────────────────────
+Hubungi kami: 185
+Email: care@indosatooredoo.com
+myIM3: indosatooredoo.com/myim3"""
+
+    elif prob >= 0.40:
+        subject = f"[Indosat] {first}, Ada Penawaran Upgrade Eksklusif Khusus Untukmu!"
+        body = f"""Kepada Yth.
+{row['name']},
+
+Halo {first}! Salam dari Indosat Ooredoo Hutchison.{postpaid_line}
+
+Sebagai pelanggan {loyalty_name} yang sudah bersama kami selama {row['tenure']} hari, kamu berhak mendapatkan akses ke penawaran upgrade eksklusif yang tidak tersedia untuk umum.
+
+Kami telah menganalisis kebiasaan penggunaan kamu sebagai {interest_name} dan menyiapkan penawaran terbaik:
+
+🚀 PENAWARAN UPGRADE EKSKLUSIF UNTUK {first.upper()}:
+   ➜ Dapatkan {offer}
+   ➜ Manfaat: {benefit.capitalize()}.
+
+Cara aktivasi:
+   1. Buka aplikasi myIM3
+   2. Pilih menu "Upgrade Paket"
+   3. Pilih paket rekomendasi dan nikmati manfaatnya langsung
+
+Penawaran ini hanya tersedia 7 hari ke depan, khusus untuk {first}.
+
+Salam,
+Tim Customer Experience
+Indosat Ooredoo Hutchison
+{today}
+────────────────────────
+Hubungi kami: 185
+Email: care@indosatooredoo.com"""
+
+    else:
+        subject = f"[Indosat] Terima Kasih, {first}! Hadiah Loyalitas Menantimu 🎁"
+        body = f"""Kepada Yth.
+{row['name']},
+
+Halo {first}! Terima kasih telah menjadi pelanggan setia Indosat selama {row['tenure']} hari.{postpaid_line}
+
+Kesetiaan kamu sangat berarti bagi kami. Sebagai pelanggan {loyalty_name}, kamu adalah bagian dari kelompok pelanggan terbaik Indosat.
+
+🎁 HADIAH LOYALITAS BULAN INI UNTUK {first.upper()}:
+   ➜ Poin reward ekstra 2x lipat untuk semua transaksi
+   ➜ Akses prioritas ke penawaran eksklusif member {loyalty_name}
+
+Tukarkan poin kamu untuk mendapatkan kuota data tambahan, diskon tagihan, atau voucher belanja partner Indosat.
+
+Cara tukar poin:
+   1. Buka aplikasi myIM3
+   2. Pilih menu "Poin & Reward"
+   3. Pilih hadiah favoritmu
+
+Terima kasih, {first}. Kami berkomitmen memberikan yang terbaik untukmu.
+
+Salam,
+Tim Loyalty & Rewards
+Indosat Ooredoo Hutchison
+{today}
+────────────────────────
+Hubungi kami: 185
+Email: care@indosatooredoo.com"""
+
+    return subject, body
+
+def generate_whatsapp(row, prob, offer, benefit):
+    first = row["name"].split()[0]
+    if prob >= 0.70:
+        return f"""Halo *{first}*! 👋
+
+Kami dari *Indosat Ooredoo Hutchison* ingin menyampaikan penawaran spesial yang kami siapkan khusus untukmu.
+
+🎁 *HADIAH EKSKLUSIF UNTUKMU:*
+✅ {offer.capitalize()}
+✅ {benefit.capitalize()}
+
+Penawaran ini hanya berlaku *48 jam* dan khusus untuk {first} saja.
+
+Cara klaim:
+1️⃣ Buka aplikasi myIM3
+2️⃣ Masuk ke "Penawaran Spesial"
+3️⃣ Tap *Klaim Sekarang*
+
+Atau balas pesan ini dengan *YA* dan tim kami siap membantu! 😊
+
+_Indosat Care · 185_"""
+
+    elif prob >= 0.40:
+        return f"""Halo *{first}*! 👋
+
+Ada kabar baik dari *Indosat Ooredoo Hutchison* khusus untukmu!
+
+🚀 *PENAWARAN UPGRADE EKSKLUSIF:*
+✅ {offer.capitalize()}
+✅ {benefit.capitalize()}
+
+Penawaran ini tersedia *7 hari ke depan* dan hanya untuk {first}.
+
+Aktifkan sekarang di aplikasi *myIM3* → menu Upgrade Paket.
+
+Ada pertanyaan? Balas pesan ini ya! 😊
+
+_Indosat Care · 185_"""
+
+    else:
+        return f"""Halo *{first}*! 🌟
+
+Terima kasih sudah setia bersama *Indosat* selama {row['tenure']} hari!
+
+🎁 *HADIAH LOYALITAS BULAN INI:*
+✅ Poin reward 2x lipat untuk semua transaksi
+✅ Akses eksklusif penawaran member
+
+Tukar poinmu sekarang di *myIM3* → menu Poin & Reward.
+
+Terima kasih, {first}! Kami senang kamu bersama kami. 💙
+
+_Indosat Care · 185_"""
+
+# ── MAIN UI ──────────────────────────────────────────────────────────────────
+st.title("📡 Indosat CRM AI — Customer Intelligence Platform")
+st.caption("AI-powered churn prediction · Personalized Email & WhatsApp · Marketer action guide")
+st.markdown("---")
+
+tab1, tab2 = st.tabs(["🔍 Search & Predict", "📋 All Customers"])
+
+with tab1:
+    st.subheader("Search Customer")
+    c1, c2, c3 = st.columns([2,1,1])
+    with c1:
+        search = st.text_input("Search by name, email, WhatsApp, or ID", placeholder="e.g. Budi, gmail, IOH-0003...")
+    with c2:
+        filter_risk = st.selectbox("Risk Level", ["All","🔴 High Risk (>70%)","🟠 Medium (40-70%)","🟢 Low Risk (<40%)"])
+    with c3:
+        filter_plan = st.selectbox("Plan Type", ["All","Postpaid","Prepaid"])
+
+    results = df.copy()
+    if search:
+        mask = (df["name"].str.contains(search,case=False) |
+                df["email"].str.contains(search,case=False) |
+                df["whatsapp"].str.contains(search,case=False) |
+                df["id"].str.contains(search,case=False))
+        results = df[mask]
+    if filter_plan != "All":
+        results = results[results["plan_type"]==filter_plan]
+
+    if results.empty:
+        st.warning("No customer found. Try a different search.")
+    else:
+        Xi = results[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
+        probs = model.predict_proba(Xi)[:,1]
+        results = results.copy()
+        results["prob"] = probs
+
+        if filter_risk == "🔴 High Risk (>70%)":    results = results[results["prob"]>=0.70]
+        elif filter_risk == "🟠 Medium (40-70%)":   results = results[(results["prob"]>=0.40)&(results["prob"]<0.70)]
+        elif filter_risk == "🟢 Low Risk (<40%)":   results = results[results["prob"]<0.40]
+
+        st.markdown(f"**{len(results)} customer(s) found**")
+
+        for _, row in results.iterrows():
+            prob = row["prob"]
+            if prob>=0.70:   risk_icon,risk_text="🔴","HIGH RISK — Churn Prevention"
+            elif prob>=0.40: risk_icon,risk_text="🟠","MEDIUM RISK — ARPU Growth"
+            else:            risk_icon,risk_text="🟢","LOW RISK — Loyalty Reward"
+            plan_badge = "🏢 Postpaid" if row["plan_type"]=="Postpaid" else "📦 Prepaid"
+
+            with st.expander(f"{risk_icon} {row['name']} · {row['email']} · {plan_badge} · {risk_text} ({prob*100:.1f}%)"):
+
+                st.markdown("### 👤 Customer Profile")
+                p1,p2,p3,p4,p5 = st.columns(5)
+                p1.metric("ID", row["id"])
+                p2.metric("Email", row["email"])
+                p3.metric("WhatsApp", row["whatsapp"])
+                p4.metric("City", row["city"])
+                p5.metric("Plan Type", plan_badge)
+
+                p6,p7,p8,p9,p10 = st.columns(5)
+                tl,_ = tseg(row["tenure"]); al,_ = aseg(row["arpu"])
+                p6.metric("Active Plan", row["plan"])
+                p7.metric("Tenure", f"{row['tenure']}d", tl)
+                p8.metric("ARPU/mo", f"Rp {row['arpu']:,}", al)
+                p9.metric("Last Top-up", row["last_active"])
+                p10.metric("Complaints", f"{row['complaints']} open")
+
+                p11,p12,p13,p14 = st.columns(4)
+                p11.metric("Loyalty", f"{LOYALTY_ICON[row['loyalty']]} {LOYALTY[row['loyalty']]}")
+                p12.metric("Interest", f"{INTEREST_ICON[row['interest']]} {INTEREST[row['interest']]}")
+                p13.metric("Data Drop", f"{row['data_drop']:.0f}%")
+                p14.metric("Network Score", f"{row['network']}/5")
+                st.markdown("---")
+
+                st.markdown("### 🤖 AI Churn Prediction")
+                pa, pb = st.columns([1,2])
+                with pa:
+                    st.metric("Churn Probability", f"{prob*100:.1f}%", risk_text)
+                with pb:
+                    drivers = get_drivers(row)
+                    st.markdown("**Top Risk Drivers:**")
+                    for i,d in enumerate(drivers): st.markdown(f"**{i+1}.** {d}")
+                st.markdown("---")
+
+                st.markdown("### 🎯 Marketer Action Plan")
+                actions = marketer_actions(prob, row["plan_type"], row["interest"], row["loyalty"])
+                for a in actions: st.markdown(f"- {a}")
+                st.markdown("---")
+
+                offer, benefit = get_offer(row["interest"], row["plan_type"])
+                subject, email_body = generate_email_content(row, prob, offer, benefit)
+                wa_msg = generate_whatsapp(row, prob, offer, benefit)
+
+                st.markdown("### 📣 Personalized Messages")
+                mt1, mt2 = st.tabs(["📧 Email", "💬 WhatsApp"])
+
+                with mt1:
+                    st.markdown(f"**To:** `{row['email']}`")
+                    st.markdown(f"**Subject:** `{subject}`")
+                    st.text_area("Email Body", email_body, height=320, key=f"email_{row['id']}")
+
+                with mt2:
+                    st.markdown(f"**To:** `{row['whatsapp']}`")
+                    st.text_area("WhatsApp Message", wa_msg, height=220, key=f"wa_{row['id']}")
+
+                st.markdown("---")
+                st.markdown("### 📤 Send to Customer")
+                now = datetime.now().strftime("%H:%M:%S")
+                b1,b2,b3 = st.columns(3)
+
+                if b1.button(f"📧 Send Email", key=f"se_{row['id']}"):
+                    if not gmail_app_pass:
+                        st.error("Please enter your Gmail App Password in the sidebar.")
+                    else:
+                        ok, msg = send_email(row["email"], subject, email_body, sender_email, gmail_app_pass)
+                        if ok: st.success(f"✅ Email sent to {row['email']} at {now}")
+                        else:  st.error(f"❌ Failed: {msg}")
+
+                if b2.button(f"💬 Send WhatsApp", key=f"sw_{row['id']}"):
+                    if not twilio_sid or not twilio_token or not twilio_wa_from:
+                        st.error("Please enter Twilio credentials in the sidebar.")
+                    else:
+                        ok, msg = send_whatsapp(row["whatsapp"], wa_msg, twilio_sid, twilio_token, twilio_wa_from)
+                        if ok: st.success(f"✅ WhatsApp sent to {row['whatsapp']} at {now}")
+                        else:  st.error(f"❌ Failed: {msg}")
+
+                if b3.button(f"📤 Send Both", key=f"sb_{row['id']}"):
+                    errors = []
+                    if not gmail_app_pass:
+                        errors.append("Gmail App Password missing")
+                    else:
+                        ok, msg = send_email(row["email"], subject, email_body, sender_email, gmail_app_pass)
+                        if not ok: errors.append(f"Email: {msg}")
+                    if not twilio_sid or not twilio_token or not twilio_wa_from:
+                        errors.append("Twilio credentials missing")
+                    else:
+                        ok, msg = send_whatsapp(row["whatsapp"], wa_msg, twilio_sid, twilio_token, twilio_wa_from)
+                        if not ok: errors.append(f"WhatsApp: {msg}")
+                    if errors:
+                        for e in errors: st.error(f"❌ {e}")
+                    else:
+                        st.success(f"✅ Email + WhatsApp sent to {row['name']} at {now}")
+
+with tab2:
+    st.subheader("📋 All Customers Overview")
+    Xi2 = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
+    all_probs = model.predict_proba(Xi2)[:,1]
+    disp = df.copy()
+    disp["Churn Risk"]  = (all_probs*100).round(1).astype(str)+"%"
+    disp["Risk Level"]  = ["🔴 HIGH" if p>=0.70 else "🟠 MED" if p>=0.40 else "🟢 LOW" for p in all_probs]
+    disp["Loyalty"]     = disp["loyalty"].apply(lambda x: f"{LOYALTY_ICON[x]} {LOYALTY[x]}")
+    disp["Interest"]    = disp["interest"].apply(lambda x: f"{INTEREST_ICON[x]} {INTEREST[x]}")
+    disp["ARPU"]        = disp["arpu"].apply(lambda x: f"Rp {x:,}")
+    show = disp[["id","name","email","whatsapp","plan_type","city","tenure","ARPU","Loyalty","Interest","Churn Risk","Risk Level"]].rename(
+        columns={"id":"ID","name":"Name","email":"Email","whatsapp":"WhatsApp",
+                 "plan_type":"Plan","city":"City","tenure":"Tenure(d)"})
+    st.dataframe(show, use_container_width=True, hide_index=True)
+    st.markdown("---")
+    total=len(df); high=sum(all_probs>=0.70); med=sum((all_probs>=0.40)&(all_probs<0.70)); low=sum(all_probs<0.40); post=len(df[df["plan_type"]=="Postpaid"])
+    m1,m2,m3,m4,m5 = st.columns(5)
+    m1.metric("Total Customers", total)
+    m2.metric("🔴 High Risk", high, f"{high/total*100:.0f}%")
+    m3.metric("🟠 Medium Risk", med, f"{med/total*100:.0f}%")
+    m4.metric("🟢 Low Risk", low, f"{low/total*100:.0f}%")
+    m5.metric("🏢 Postpaid", post, f"{post/total*100:.0f}% of total")
