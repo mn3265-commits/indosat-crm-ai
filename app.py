@@ -202,32 +202,55 @@ RULES:
 @st.cache_resource
 def generate_customers():
     random.seed(42); np.random.seed(42)
-    customers = [
-        {"name":"Agung Nugroho",  "email":"mn3265@columbia.edu",       "whatsapp":"+16469890162", "plan_type":"Postpaid"},
-        {"name":"Budi Santoso",   "email":"budi.santoso@gmail.com",    "whatsapp":"+6281234560001","plan_type":"Postpaid"},
-        {"name":"Siti Rahayu",    "email":"siti.rahayu@yahoo.com",     "whatsapp":"+6281234560002","plan_type":"Prepaid"},
-        {"name":"Ahmad Fauzi",    "email":"ahmad.fauzi@gmail.com",     "whatsapp":"+6281234560003","plan_type":"Postpaid"},
-        {"name":"Dewi Lestari",   "email":"dewi.lestari@outlook.com",  "whatsapp":"+6281234560004","plan_type":"Postpaid"},
-        {"name":"Rizky Pratama",  "email":"rizky.pratama@gmail.com",   "whatsapp":"+6281234560005","plan_type":"Prepaid"},
-        {"name":"Nurul Hidayah",  "email":"nurul.hidayah@gmail.com",   "whatsapp":"+6281234560006","plan_type":"Postpaid"},
-        {"name":"Andi Wijaya",    "email":"andi.wijaya@gmail.com",     "whatsapp":"+6281234560007","plan_type":"Prepaid"},
-        {"name":"Fitri Handayani","email":"fitri.handayani@yahoo.com", "whatsapp":"+6281234560008","plan_type":"Postpaid"},
-        {"name":"Deni Kurniawan", "email":"deni.kurniawan@gmail.com",  "whatsapp":"+6281234560009","plan_type":"Prepaid"},
-        {"name":"Maya Putri",     "email":"maya.putri@outlook.com",    "whatsapp":"+6281234560010","plan_type":"Postpaid"},
-        {"name":"Hendra Gunawan", "email":"hendra.gunawan@gmail.com",  "whatsapp":"+6281234560011","plan_type":"Postpaid"},
-        {"name":"Rina Susanti",   "email":"rina.susanti@gmail.com",    "whatsapp":"+6281234560012","plan_type":"Prepaid"},
-        {"name":"Fajar Setiawan", "email":"fajar.setiawan@gmail.com",  "whatsapp":"+6281234560013","plan_type":"Postpaid"},
-        {"name":"Lina Marlina",   "email":"lina.marlina@yahoo.com",    "whatsapp":"+6281234560014","plan_type":"Prepaid"},
-        {"name":"Bagas Prabowo",  "email":"bagas.prabowo@gmail.com",   "whatsapp":"+6281234560015","plan_type":"Postpaid"},
-        {"name":"Indah Permata",  "email":"indah.permata@outlook.com", "whatsapp":"+6281234560016","plan_type":"Prepaid"},
-        {"name":"Roni Saputra",   "email":"roni.saputra@gmail.com",    "whatsapp":"+6281234560017","plan_type":"Postpaid"},
-        {"name":"Wulan Sari",     "email":"wulan.sari@gmail.com",      "whatsapp":"+6281234560018","plan_type":"Prepaid"},
-        {"name":"Agus Hartono",   "email":"agus.hartono@gmail.com",    "whatsapp":"+6281234560019","plan_type":"Postpaid"},
-        {"name":"Citra Dewi",     "email":"citra.dewi@yahoo.com",      "whatsapp":"+6281234560020","plan_type":"Postpaid"},
+
+    # First names and last names for generating 100 realistic Indonesian customers
+    first_names = [
+        "Agung","Budi","Siti","Ahmad","Dewi","Rizky","Nurul","Andi","Fitri","Deni",
+        "Maya","Hendra","Rina","Fajar","Lina","Bagas","Indah","Roni","Wulan","Agus",
+        "Citra","Tono","Putri","Wahyu","Ratna","Dimas","Yuni","Eko","Sari","Joko",
+        "Nita","Arif","Mega","Bambang","Ayu","Reza","Ani","Surya","Tika","Irwan",
+        "Novi","Hendri","Dina","Prasetyo","Lia","Galih","Wati","Yusuf","Intan","Kukuh",
+        "Sinta","Teguh","Mira","Haryo","Lestari","Faisal","Dian","Bagus","Nuri","Sigit",
+        "Evi","Guntur","Ratih","Pandu","Yanti","Ilham","Rini","Danang","Laras","Bima",
+        "Tiara","Adi","Kania","Rudi","Anisa","Haris","Melati","Jaya","Kartika","Umar",
+        "Dewanti","Lutfi","Puspa","Rangga","Siska","Taufik","Anggi","Wisnu","Cantika","Ferdi",
+        "Nadia","Satria","Bunga","Yoga","Amira","Gilang","Zahra","Kemal","Elsa","Rama",
     ]
+    last_names = [
+        "Nugroho","Santoso","Rahayu","Fauzi","Lestari","Pratama","Hidayah","Wijaya",
+        "Handayani","Kurniawan","Putri","Gunawan","Susanti","Setiawan","Marlina",
+        "Prabowo","Permata","Saputra","Sari","Hartono","Dewi","Suryadi","Wibowo",
+        "Kusuma","Hakim","Utama","Pranata","Budiman","Firmansyah","Mulyadi",
+    ]
+    domains = ["gmail.com","yahoo.com","outlook.com","hotmail.com"]
+
+    # Agung (real user) is always first
+    customers = [{"name":"Agung Nugroho","email":"mn3265@columbia.edu","whatsapp":"+16469890162","plan_type":"Postpaid"}]
+
+    # Generate 99 more
+    used_names = {"Agung Nugroho"}
+    for idx in range(99):
+        while True:
+            fn = random.choice(first_names)
+            ln = random.choice(last_names)
+            full = f"{fn} {ln}"
+            if full not in used_names:
+                used_names.add(full)
+                break
+        email_name = f"{fn.lower()}.{ln.lower()}"
+        domain = random.choice(domains)
+        plan = random.choice(["Postpaid","Prepaid"])
+        customers.append({
+            "name": full,
+            "email": f"{email_name}@{domain}",
+            "whatsapp": f"+62812{random.randint(10000000,99999999)}",
+            "plan_type": plan,
+        })
+
     plans_post = ["Postpaid Freedom 50","Postpaid Business Pro","Postpaid Platinum","Postpaid Family"]
     plans_pre  = ["Prepaid Freedom","Prepaid Social","Prepaid Gaming","Prepaid Basic"]
-    cities     = ["Jakarta","Surabaya","Bandung","Medan","Semarang","Makassar","Yogyakarta"]
+    cities     = ["Jakarta","Surabaya","Bandung","Medan","Semarang","Makassar","Yogyakarta",
+                  "Denpasar","Palembang","Balikpapan","Manado","Pontianak","Malang"]
     rows = []
     for i, c in enumerate(customers):
         tenure    = random.randint(5, 720)
