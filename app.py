@@ -619,10 +619,6 @@ st.markdown("""<style>
 [data-testid="stMetricValue"] {font-size:1.4rem; font-weight:700; color:#1a1a1a;}
 div[data-testid="stExpander"] {border:1px solid #e8e8e8; border-radius:6px;}
 .block-container {padding-top:2rem; max-width:1100px;}
-.risk-badge {display:inline-block; padding:3px 12px; border-radius:4px; font-weight:700; font-size:0.85rem; letter-spacing:0.3px;}
-.risk-high {background:#FDEDED; color:#C62828; border:1px solid #EF9A9A;}
-.risk-med {background:#FFF8E1; color:#E65100; border:1px solid #FFE082;}
-.risk-low {background:#E8F5E9; color:#2E7D32; border:1px solid #A5D6A7;}
 .risk-box {padding:20px; border-radius:8px; margin:8px 0;}
 .risk-box-high {background:#FDEDED; border-left:4px solid #C62828;}
 .risk-box-med {background:#FFF8E1; border-left:4px solid #E65100;}
@@ -807,7 +803,7 @@ with tab1:
                     <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s3_done and not s4_done, s4_done)}">4. OUTCOME</div>
                 </div>""", unsafe_allow_html=True)
 
-                # ── Combined profile + prediction card ────────────────
+                # ── Profile + Prediction ──────────────────────────────
                 drivers = get_drivers(row)
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
                 effective_prob = display_prob
@@ -817,47 +813,29 @@ with tab1:
                     override_driver = f"Marketer override: {saved_reason}" if saved_reason else "Marketer override (no reason given)"
                     drivers = [override_driver] + drivers
 
-                badge = risk_badge_html(effective_prob)
-                override_note = ""
-                if is_overridden:
-                    saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
-                    reason_text = f" ({saved_reason})" if saved_reason else ""
-                    override_note = f'<div style="font-size:0.75rem; color:#888; margin-top:4px;">Override{reason_text}. AI was {prob*100:.1f}%.</div>'
+                profile_col, risk_col = st.columns([3, 2], gap="large")
 
-                driver_html = "".join(f"<div style='margin:3px 0; font-size:0.85rem;'><strong>{i+1}.</strong> {d}</div>" for i, d in enumerate(drivers))
+                with profile_col:
+                    st.markdown(f"""| | |
+|:--|:--|
+| **ID** | {row['id']} |
+| **Plan** | {row['plan']} ({row['plan_type']}) |
+| **City** | {row['city']} |
+| **Tenure** | {row['tenure']}d ({tseg(row['tenure'])}) |
+| **ARPU** | Rp {row['arpu']:,}/mo ({aseg(row['arpu'])}) |
+| **Loyalty** | {LOYALTY[row['loyalty']]} |
+| **Data Drop** | {row['data_drop']:.0f}% |
+| **Complaints** | {row['complaints']} open |
+| **Network** | {row['network']}/5 |""")
 
-                # Single unified card: profile left, prediction right
-                box_cls = risk_box_class(effective_prob)
-                profile_items = f"""
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 24px; font-size:0.85rem;">
-                        <div><span style="color:#888;">ID:</span> {row['id']}</div>
-                        <div><span style="color:#888;">Plan:</span> {row['plan']}</div>
-                        <div><span style="color:#888;">City:</span> {row['city']}</div>
-                        <div><span style="color:#888;">Tenure:</span> {row['tenure']}d ({tseg(row['tenure'])})</div>
-                        <div><span style="color:#888;">ARPU:</span> Rp {row['arpu']:,}/mo</div>
-                        <div><span style="color:#888;">Loyalty:</span> {LOYALTY[row['loyalty']]}</div>
-                        <div><span style="color:#888;">Data Drop:</span> {row['data_drop']:.0f}%</div>
-                        <div><span style="color:#888;">Complaints:</span> {row['complaints']} open</div>
-                        <div><span style="color:#888;">Email:</span> {row['email']}</div>
-                        <div><span style="color:#888;">Phone:</span> {row['whatsapp']}</div>
-                    </div>"""
-
-                st.markdown(f"""<div class="{box_cls}">
-                    <div style="display:flex; gap:32px; flex-wrap:wrap;">
-                        <div style="flex:1; min-width:280px;">
-                            <div style="color:#888; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; font-weight:600;">Customer Profile</div>
-                            {profile_items}
-                        </div>
-                        <div style="min-width:200px; border-left:1px solid rgba(0,0,0,0.1); padding-left:24px;">
-                            <div style="color:#888; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; font-weight:600;">Churn Risk</div>
-                            <div style="font-size:2.2rem; font-weight:700; line-height:1;">{effective_prob*100:.1f}%</div>
-                            <div style="margin:8px 0;">{badge}</div>
-                            {override_note}
-                            <div style="margin-top:12px; color:#888; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">Risk Drivers</div>
-                            {driver_html}
-                        </div>
-                    </div>
-                </div>""", unsafe_allow_html=True)
+                with risk_col:
+                    st.metric("Churn Probability", f"{effective_prob*100:.1f}%", rlabel)
+                    if is_overridden:
+                        saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
+                        st.caption(f"Override: {saved_reason}. AI was {prob*100:.1f}%.")
+                    st.markdown("**Risk Drivers**")
+                    for i, d in enumerate(drivers):
+                        st.markdown(f"{i+1}. {d}")
 
                 # ── Step 2: Marketer Decision ─────────────────────────
                 st.markdown("")
@@ -899,27 +877,25 @@ with tab1:
                     call_msg = st.session_state[ai_key].get("call", st.session_state[ai_key].get("sms", call_msg))
                     msg_source = "Claude AI"
 
-                msg_h1, msg_h2 = st.columns([3, 1])
-                with msg_h1:
-                    st.markdown(f"**Retention Messages** &nbsp; `{msg_source}`")
-                with msg_h2:
-                    if anthropic_key and ANTHROPIC_AVAILABLE:
-                        if st.button("Generate with AI", key=f"ai_{row['id']}"):
-                            with st.spinner("Generating..."):
-                                result = generate_with_claude(row, effective_prob, drivers, offer, benefit, anthropic_key)
-                            if result:
-                                st.session_state[ai_key] = {"subject": result[0], "email": result[1], "call": result[2]}
-                                st.rerun()
-                            else:
-                                st.error("Generation failed.")
+                st.markdown(f"**Retention Messages** (`{msg_source}`)")
+                if anthropic_key and ANTHROPIC_AVAILABLE:
+                    if st.button("Generate with Claude AI", key=f"ai_{row['id']}"):
+                        with st.spinner("Generating..."):
+                            result = generate_with_claude(row, effective_prob, drivers, offer, benefit, anthropic_key)
+                        if result:
+                            st.session_state[ai_key] = {"subject": result[0], "email": result[1], "call": result[2]}
+                            st.rerun()
+                        else:
+                            st.error("Generation failed.")
 
                 email_col, call_col = st.columns(2, gap="medium")
                 with email_col:
-                    st.caption(f"Email  /  {row['email']}  /  {subject}")
-                    st.text_area("E", email_body, height=240, key=f"email_{row['id']}", label_visibility="collapsed")
+                    st.markdown(f"**Email** to `{row['email']}`")
+                    st.caption(f"Subject: {subject}")
+                    st.text_area("Email body", email_body, height=240, key=f"email_{row['id']}", label_visibility="collapsed")
                 with call_col:
-                    st.caption(f"Voice Call  /  {row['whatsapp']}")
-                    st.text_area("C", call_msg, height=240, key=f"call_{row['id']}", label_visibility="collapsed")
+                    st.markdown(f"**Voice Call** to `{row['whatsapp']}`")
+                    st.text_area("Call script", call_msg, height=240, key=f"call_{row['id']}", label_visibility="collapsed")
 
                 se1, se2, se3, _ = st.columns([1, 1, 1, 1])
                 if se1.button("Send Email", key=f"se_{row['id']}"):
