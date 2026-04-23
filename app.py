@@ -756,19 +756,37 @@ with tab1:
                 p8.metric("Complaints", f"{row['complaints']} open")
                 st.markdown("")
 
-                # ── Prediction ─────────────────────────────────────────
+                # ── Compute effective probability (check override first) ─
                 drivers = get_drivers(row)
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
+                override_key = f"override_{row['id']}"
+                current_override = st.session_state.get(override_key, "Use AI prediction")
 
-                box_cls = risk_box_class(prob)
-                badge = risk_badge_html(prob)
+                effective_prob = prob
+                is_overridden = current_override != "Use AI prediction"
+                if is_overridden:
+                    if "HIGH" in current_override: effective_prob = 0.85
+                    elif "MEDIUM" in current_override: effective_prob = 0.55
+                    else: effective_prob = 0.20
+
+                # ── Prediction box (uses effective_prob for color) ─────
+                box_cls = risk_box_class(effective_prob)
+                badge = risk_badge_html(effective_prob)
+                override_note = ""
+                if is_overridden:
+                    saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
+                    reason_text = f" ({saved_reason})" if saved_reason else ""
+                    override_note = (
+                        f'<div style="margin-top:8px; font-size:0.8rem; color:#555;">'
+                        f'Overridden by marketer{reason_text}. AI prediction was {prob*100:.1f}%.</div>')
+
                 driver_html = "".join(f"<div style='margin:4px 0;'><strong>{i+1}.</strong> {d}</div>" for i, d in enumerate(drivers))
                 st.markdown(f"""<div class="{box_cls}">
                     <div style="display:flex; align-items:flex-start; gap:32px; flex-wrap:wrap;">
                         <div style="min-width:160px;">
                             <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Churn Probability</div>
-                            <div style="font-size:2rem; font-weight:700; margin-bottom:8px;">{prob*100:.1f}%</div>
-                            {badge}
+                            <div style="font-size:2rem; font-weight:700; margin-bottom:8px;">{effective_prob*100:.1f}%</div>
+                            {badge}{override_note}
                         </div>
                         <div style="flex:1; min-width:250px;">
                             <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Risk Drivers</div>
@@ -779,8 +797,7 @@ with tab1:
 
                 # ── Human Override ─────────────────────────────────────
                 st.markdown("")
-                override_key = f"override_{row['id']}"
-                with st.expander("Human-in-the-loop: Override risk level"):
+                with st.expander("Override risk level" if not is_overridden else f"Override active: {current_override}"):
                     st.markdown(
                         "Marketers can override the AI prediction based on context the model cannot see "
                         "(e.g., recent branch visit, known personal circumstances, ongoing negotiation)."
@@ -788,7 +805,6 @@ with tab1:
                     ov1, ov2 = st.columns([2, 1])
                     with ov1:
                         override_options = ["Use AI prediction", "Override to HIGH RISK", "Override to MEDIUM", "Override to LOW RISK"]
-                        current_override = st.session_state.get(override_key, "Use AI prediction")
                         override_choice = st.selectbox(
                             "Risk level", override_options,
                             index=override_options.index(current_override),
@@ -799,23 +815,14 @@ with tab1:
                             placeholder="e.g., Customer visited branch yesterday",
                             key=f"ov_reason_{row['id']}")
 
-                    if override_choice != "Use AI prediction":
-                        if st.button("Apply override", key=f"ov_apply_{row['id']}"):
-                            st.session_state[override_key] = override_choice
-                            st.session_state[f"ov_reason_saved_{row['id']}"] = override_reason
-                            st.rerun()
-
-                    if current_override != "Use AI prediction":
-                        saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "N/A")
-                        st.info(f"Active override: **{current_override}**. Reason: {saved_reason}")
-
-                # Apply override to effective probability for actions/messages
-                effective_prob = prob
-                if st.session_state.get(override_key, "Use AI prediction") != "Use AI prediction":
-                    override_val = st.session_state[override_key]
-                    if "HIGH" in override_val: effective_prob = 0.85
-                    elif "MEDIUM" in override_val: effective_prob = 0.55
-                    else: effective_prob = 0.20
+                    if st.button("Apply" if override_choice != "Use AI prediction" else "Reset to AI prediction", key=f"ov_apply_{row['id']}"):
+                        st.session_state[override_key] = override_choice
+                        st.session_state[f"ov_reason_saved_{row['id']}"] = override_reason
+                        # Clear AI-generated messages so they regenerate with new risk level
+                        ai_key_clear = f"ai_msg_{row['id']}"
+                        if ai_key_clear in st.session_state:
+                            del st.session_state[ai_key_clear]
+                        st.rerun()
 
                 # ── Actions ───────────────────────────────────────────
                 st.markdown("")
@@ -827,9 +834,9 @@ with tab1:
                 # ── Messages ──────────────────────────────────────────
                 st.markdown("")
 
-                # Prepare messages (template or AI)
-                subject, email_body = generate_email_content(row, prob, offer, benefit)
-                wa_msg = generate_whatsapp(row, prob, offer, benefit)
+                # Prepare messages (uses effective_prob, not raw prob)
+                subject, email_body = generate_email_content(row, effective_prob, offer, benefit)
+                wa_msg = generate_whatsapp(row, effective_prob, offer, benefit)
                 msg_source = "Rule-based template"
                 ai_key = f"ai_msg_{row['id']}"
                 if ai_key in st.session_state:
@@ -847,7 +854,7 @@ with tab1:
                     if anthropic_key and ANTHROPIC_AVAILABLE:
                         if st.button("Generate with Claude AI", key=f"ai_{row['id']}"):
                             with st.spinner("Claude is writing..."):
-                                result = generate_with_claude(row, prob, drivers, offer, benefit, anthropic_key)
+                                result = generate_with_claude(row, effective_prob, drivers, offer, benefit, anthropic_key)
                             if result:
                                 st.session_state[ai_key] = {"subject": result[0], "email": result[1], "whatsapp": result[2]}
                                 st.rerun()
