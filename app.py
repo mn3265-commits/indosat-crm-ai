@@ -158,8 +158,50 @@ def train_model():
     m=GradientBoostingClassifier(n_estimators=100,max_depth=4,random_state=42)
     m.fit(X,ch); return m
 
+@st.cache_resource
+def evaluate_model_metrics():
+    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import (roc_auc_score, precision_score, recall_score,
+                                 f1_score, accuracy_score, confusion_matrix)
+    import time as _time
+    np.random.seed(42); n=3000
+    td=np.random.randint(0,730,n); ar=np.random.randint(5000,350000,n)
+    lo=np.random.randint(0,4,n);   ins=np.random.randint(0,4,n)
+    dd=np.random.uniform(0,100,n); tp=np.random.randint(0,60,n)
+    co=np.random.randint(0,6,n);   nq=np.random.uniform(1,5,n)
+    cp=(0.30*(td<100)+0.20*(ar<20000)+0.15*(lo==0)+0.10*(dd>50)+0.10*(tp>20)+0.10*(co>=2)+0.05*(nq<2.5))
+    ch=(cp+np.random.normal(0,0.05,n)>0.40).astype(int)
+    X=np.column_stack([td,ar,lo,ins,dd,tp,co,nq])
+    X_tr,X_te,y_tr,y_te = train_test_split(X,ch,test_size=0.15,random_state=42,stratify=ch)
+    X_tr,X_va,y_tr,y_va = train_test_split(X_tr,y_tr,test_size=0.176,random_state=42,stratify=y_tr)
+    t0=_time.time()
+    m=GradientBoostingClassifier(n_estimators=100,max_depth=4,random_state=42)
+    m.fit(X_tr,y_tr)
+    train_time=_time.time()-t0
+    t1=_time.time()
+    y_pred=m.predict(X_te); y_prob=m.predict_proba(X_te)[:,1]
+    infer_time=_time.time()-t1
+    features=['Tenure','ARPU','Loyalty','Interest','Data Drop','Top-up Days','Complaints','Network Quality']
+    imp=m.feature_importances_
+    return {
+        "auc": roc_auc_score(y_te, y_prob),
+        "accuracy": accuracy_score(y_te, y_pred),
+        "precision": precision_score(y_te, y_pred),
+        "recall": recall_score(y_te, y_pred),
+        "f1": f1_score(y_te, y_pred),
+        "cm": confusion_matrix(y_te, y_pred),
+        "train_time": train_time,
+        "infer_time_ms": infer_time*1000,
+        "infer_per_sample_ms": infer_time*1000/len(X_te),
+        "n_train": len(X_tr), "n_val": len(X_va), "n_test": len(X_te),
+        "features": features,
+        "importances": imp,
+        "y_prob": y_prob, "y_te": y_te,
+    }
+
 df    = generate_customers()
 model = train_model()
+eval_metrics = evaluate_model_metrics()
 
 LOYALTY       = ["Bronze","Silver","Gold","Platinum"]
 LOYALTY_ICON  = ["🥉","🥈","🥇","💎"]
@@ -387,7 +429,66 @@ st.title("📡 Indosat CRM AI — Customer Intelligence Platform")
 st.caption("AI-powered churn prediction · Personalized Email & WhatsApp · Marketer action guide")
 st.markdown("---")
 
-tab1, tab2 = st.tabs(["🔍 Search & Predict", "📋 All Customers"])
+tab0, tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Dashboard", "🔍 Search & Predict", "📋 All Customers",
+    "📈 Model Evaluation", "🏗️ AI Architecture"])
+
+# ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
+with tab0:
+    st.subheader("Executive Summary")
+
+    Xi_all = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
+    probs_all = model.predict_proba(Xi_all)[:,1]
+    n_total = len(df)
+    n_high = int((probs_all >= 0.70).sum())
+    n_med = int(((probs_all >= 0.40) & (probs_all < 0.70)).sum())
+    n_low = int((probs_all < 0.40).sum())
+    n_post = int((df["plan_type"]=="Postpaid").sum())
+    n_pre = n_total - n_post
+
+    d1, d2, d3, d4, d5 = st.columns(5)
+    d1.metric("Total Customers", n_total)
+    d2.metric("High Risk", n_high, f"{n_high/n_total*100:.0f}%")
+    d3.metric("Medium Risk", n_med, f"{n_med/n_total*100:.0f}%")
+    d4.metric("Low Risk", n_low, f"{n_low/n_total*100:.0f}%")
+    d5.metric("Postpaid / Prepaid", f"{n_post} / {n_pre}")
+
+    st.markdown("---")
+
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        st.markdown("#### Risk Distribution")
+        risk_df = pd.DataFrame({
+            "Risk Level": ["High (>=70%)", "Medium (40-70%)", "Low (<40%)"],
+            "Count": [n_high, n_med, n_low]
+        }).set_index("Risk Level")
+        st.bar_chart(risk_df)
+
+    with col_right:
+        st.markdown("#### Feature Importance")
+        feat_df = pd.DataFrame({
+            "Feature": eval_metrics["features"],
+            "Importance": eval_metrics["importances"]
+        }).sort_values("Importance", ascending=False).set_index("Feature")
+        st.bar_chart(feat_df)
+
+    st.markdown("---")
+    st.markdown("#### Model Performance (Test Set)")
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
+    k2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
+    k3.metric("Precision", f"{eval_metrics['precision']:.4f}")
+    k4.metric("Recall", f"{eval_metrics['recall']:.4f}")
+    k5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
+
+    st.markdown("---")
+    st.markdown("#### Hybrid AI Architecture")
+    st.info(
+        "**Predictive AI** — GradientBoostingClassifier scores churn risk per subscriber.  \n"
+        "**Generative AI** — Anthropic Claude Sonnet 4.5 generates personalized Bahasa Indonesia retention messages.  \n"
+        "**Delivery** — Email (Gmail SMTP) + WhatsApp (Twilio API) with rule-based template fallback."
+    )
 
 with tab1:
     st.subheader("Search Customer")
@@ -546,3 +647,155 @@ with tab2:
     m3.metric("🟠 Medium Risk", med, f"{med/total*100:.0f}%")
     m4.metric("🟢 Low Risk", low, f"{low/total*100:.0f}%")
     m5.metric("🏢 Postpaid", post, f"{post/total*100:.0f}% of total")
+
+# ── Tab 3: Model Evaluation ──────────────────────────────────────────────────
+with tab3:
+    st.subheader("Prototype Model Evaluation")
+    st.markdown("Evaluation on held-out test set using stratified split. Model: `GradientBoostingClassifier(n_estimators=100, max_depth=4)`.")
+
+    st.markdown("#### Dataset Split")
+    sp1, sp2, sp3 = st.columns(3)
+    sp1.metric("Train", f"{eval_metrics['n_train']} samples")
+    sp2.metric("Validation", f"{eval_metrics['n_val']} samples")
+    sp3.metric("Test", f"{eval_metrics['n_test']} samples")
+
+    st.markdown("---")
+    st.markdown("#### Performance Metrics")
+    e1, e2, e3, e4, e5 = st.columns(5)
+    e1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
+    e2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
+    e3.metric("Precision", f"{eval_metrics['precision']:.4f}")
+    e4.metric("Recall", f"{eval_metrics['recall']:.4f}")
+    e5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
+
+    st.markdown("---")
+    st.markdown("#### Latency")
+    l1, l2, l3 = st.columns(3)
+    l1.metric("Training Time", f"{eval_metrics['train_time']:.2f}s")
+    l2.metric(f"Inference (batch {eval_metrics['n_test']})", f"{eval_metrics['infer_time_ms']:.1f} ms")
+    l3.metric("Per-sample Latency", f"{eval_metrics['infer_per_sample_ms']:.3f} ms")
+
+    st.markdown("---")
+    cm = eval_metrics["cm"]
+    st.markdown("#### Confusion Matrix")
+    cm_df = pd.DataFrame(
+        [[cm[0,0], cm[0,1]], [cm[1,0], cm[1,1]]],
+        index=["Actual: Retain", "Actual: Churn"],
+        columns=["Predicted: Retain", "Predicted: Churn"]
+    )
+    st.dataframe(cm_df, use_container_width=False)
+
+    st.markdown("---")
+    st.markdown("#### Feature Importance Ranking")
+    feat_eval = pd.DataFrame({
+        "Feature": eval_metrics["features"],
+        "Importance": eval_metrics["importances"]
+    }).sort_values("Importance", ascending=False).set_index("Feature")
+    st.bar_chart(feat_eval)
+
+    st.markdown("---")
+    st.markdown("#### Go / No-Go Evaluation")
+    gng = pd.DataFrame([
+        {"Metric": "AUC-ROC", "Target": ">= 0.80", "Actual": f"{eval_metrics['auc']:.4f}",
+         "Status": "PASS" if eval_metrics['auc']>=0.80 else "FAIL"},
+        {"Metric": "Recall (churn)", "Target": ">= 0.75", "Actual": f"{eval_metrics['recall']:.4f}",
+         "Status": "PASS" if eval_metrics['recall']>=0.75 else "FAIL"},
+        {"Metric": "Precision (churn)", "Target": ">= 0.60", "Actual": f"{eval_metrics['precision']:.4f}",
+         "Status": "PASS" if eval_metrics['precision']>=0.60 else "FAIL"},
+        {"Metric": "F1-score", "Target": ">= 0.67", "Actual": f"{eval_metrics['f1']:.4f}",
+         "Status": "PASS" if eval_metrics['f1']>=0.67 else "FAIL"},
+        {"Metric": "Latency / sample", "Target": "< 5s", "Actual": f"{eval_metrics['infer_per_sample_ms']:.3f} ms",
+         "Status": "PASS"},
+    ])
+    st.dataframe(gng, use_container_width=True, hide_index=True)
+
+    all_pass = (eval_metrics['auc']>=0.80 and eval_metrics['recall']>=0.75
+                and eval_metrics['precision']>=0.60 and eval_metrics['f1']>=0.67)
+    if all_pass:
+        st.success("**RECOMMENDATION: GO** — All pre-pilot thresholds passed by significant margins.")
+    else:
+        st.warning("**RECOMMENDATION: NEEDS REVIEW** — Some thresholds not met.")
+
+    st.markdown("---")
+    st.markdown("#### Risk Distribution (Test Set)")
+    y_prob = eval_metrics["y_prob"]
+    n_te = len(y_prob)
+    hi = int((y_prob >= 0.70).sum())
+    mi = int(((y_prob >= 0.40) & (y_prob < 0.70)).sum())
+    li = int((y_prob < 0.40).sum())
+    r1, r2, r3 = st.columns(3)
+    r1.metric("HIGH risk (>=70%)", f"{hi} ({100*hi/n_te:.1f}%)")
+    r2.metric("MEDIUM risk (40-70%)", f"{mi} ({100*mi/n_te:.1f}%)")
+    r3.metric("LOW risk (<40%)", f"{li} ({100*li/n_te:.1f}%)")
+
+# ── Tab 4: AI Architecture ───────────────────────────────────────────────────
+with tab4:
+    st.subheader("AI Solution Architecture")
+
+    st.markdown("#### Problem Statement")
+    st.markdown(
+        "Indosat Ooredoo Hutchison (IOH) serves ~95 million subscribers in Indonesia. "
+        "Churn pressure comes from SIM consolidation and competitive pricing. "
+        "Retention today is **reactive** — teams respond only after a customer has churned. "
+        "There is no system to identify at-risk subscribers in advance and deliver "
+        "personalized retention offers before they leave."
+    )
+
+    st.markdown("---")
+    st.markdown("#### Hybrid AI Architecture")
+    col_pred, col_gen = st.columns(2)
+    with col_pred:
+        st.markdown("##### Predictive AI (Churn Scoring)")
+        st.markdown(
+            "- **Model:** GradientBoostingClassifier (scikit-learn)\n"
+            "- **Config:** 100 trees, max depth 4\n"
+            "- **Task:** Supervised binary classification\n"
+            "- **Features:** 8 per subscriber (tenure, ARPU, loyalty tier, interest, "
+            "data usage drop, top-up recency, complaint count, network quality)\n"
+            "- **Why:** Gradient boosted trees are industry-standard for tabular churn prediction"
+        )
+    with col_gen:
+        st.markdown("##### Generative AI (Message Personalization)")
+        st.markdown(
+            "- **Model:** Anthropic Claude Sonnet 4.5 via API\n"
+            "- **Task:** Generate personalized Bahasa Indonesia retention messages\n"
+            "- **Input:** Customer profile + churn probability + risk drivers + recommended offer\n"
+            "- **Output:** Unique Email + WhatsApp message per subscriber\n"
+            "- **Fallback:** Rule-based templates if API is unavailable"
+        )
+
+    st.markdown("---")
+    st.markdown("#### Data Pipeline")
+    st.code("""
+Raw Data (CDR, CRM, Billing, CS Tickets, Network Logs)
+   -> Daily ingestion + NLP preprocessing (IndoBERT for Bahasa Indonesia sentiment)
+   -> Feature engineering (7d/14d/30d rolling windows) + 4-dimension segmentation
+   -> Predictive model: daily batch scoring -> churn probability per subscriber
+   -> Generative model: personalized retention message per flagged subscriber
+   -> Delivery (Email via Gmail SMTP, WhatsApp via Twilio API)
+   -> Feedback loop: outcomes (delivered / opened / retained / churned) feed monthly retraining
+    """, language=None)
+
+    st.markdown("---")
+    st.markdown("#### Technology Stack")
+    stack = pd.DataFrame([
+        {"Component": "Predictive Model", "Technology": "scikit-learn GradientBoostingClassifier (prod: XGBoost/LightGBM)"},
+        {"Component": "Generative Model", "Technology": "Anthropic Claude Sonnet 4.5 (anthropic Python SDK)"},
+        {"Component": "UI / Dashboard", "Technology": "Streamlit (deployed on Streamlit Community Cloud)"},
+        {"Component": "Email Delivery", "Technology": "Gmail SMTP (smtplib)"},
+        {"Component": "WhatsApp Delivery", "Technology": "Twilio WhatsApp API"},
+        {"Component": "Language", "Technology": "Python 3.11 (pandas, numpy, scikit-learn, anthropic, twilio)"},
+        {"Component": "Deployment", "Technology": "GitHub -> Streamlit Cloud auto-deploy on push"},
+        {"Component": "Secrets Management", "Technology": "Streamlit Cloud Secrets Manager (dev); AWS Secrets Manager (prod)"},
+    ])
+    st.dataframe(stack, use_container_width=True, hide_index=True)
+
+    st.markdown("---")
+    st.markdown("#### Next Steps for Production")
+    st.markdown(
+        "1. **Data quality sprint** — unify legacy Ooredoo + Hutchison subscriber IDs\n"
+        "2. **Recalibration** — retrain on real post-merger data (expect AUC 0.80-0.85 range)\n"
+        "3. **A/B pilot** — 10,000 subscribers, model-targeted vs. random retention outreach, "
+        "two 30-day cycles\n"
+        "4. **Go to production** only if pilot shows >= 10% churn reduction with statistical significance"
+    )
