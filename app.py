@@ -619,6 +619,17 @@ def risk_box_class(prob):
     elif prob >= 0.40: return "risk-box risk-box-med"
     else: return "risk-box risk-box-low"
 
+def apply_overrides(ids, probs):
+    """Apply any marketer overrides from session state to probability array."""
+    result = probs.copy()
+    for i, cid in enumerate(ids):
+        ov = st.session_state.get(f"override_{cid}", "Use AI prediction")
+        if ov != "Use AI prediction":
+            if "HIGH" in ov: result[i] = 0.85
+            elif "MEDIUM" in ov: result[i] = 0.55
+            else: result[i] = 0.20
+    return result
+
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
 st.title("Indosat CRM AI")
 st.caption("Customer Intelligence Platform  /  Churn Prediction  /  Personalized Retention")
@@ -631,7 +642,7 @@ tab0, tab1, tab2, tab5, tab3, tab4 = st.tabs([
 # ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
 with tab0:
     Xi_all = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
-    probs_all = model.predict_proba(Xi_all)[:,1]
+    probs_all = apply_overrides(df["id"].values, model.predict_proba(Xi_all)[:,1])
     n_total = len(df)
     n_high = int((probs_all >= 0.70).sum())
     n_med = int(((probs_all >= 0.40) & (probs_all < 0.70)).sum())
@@ -710,6 +721,7 @@ with tab1:
     else:
         Xi = results[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
         probs = model.predict_proba(Xi)[:,1]
+        probs = apply_overrides(results["id"].values, probs)
         results = results.copy()
         results["prob"] = probs
 
@@ -946,7 +958,7 @@ with tab1:
 with tab2:
     st.markdown("")
     Xi2 = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
-    all_probs = model.predict_proba(Xi2)[:,1]
+    all_probs = apply_overrides(df["id"].values, model.predict_proba(Xi2)[:,1])
     disp = df.copy()
     disp["Churn Risk"]  = (all_probs*100).round(1).astype(str)+"%"
     disp["Risk Level"]  = ["🔴 HIGH" if p>=0.70 else "🟠 MED" if p>=0.40 else "🟢 LOW" for p in all_probs]
