@@ -886,25 +886,28 @@ with tab1:
 
                 # ── SECTION 3: Actions ────────────────────────────────
                 subsection("Actions")
+                def do_approve(rid):
+                    st.session_state[f"reviewed_{rid}"] = True
+                def do_escalate(rid):
+                    st.session_state[f"override_{rid}"] = "Override to HIGH RISK"
+                    st.session_state[f"ov_reason_saved_{rid}"] = "Escalated by marketer"
+                    st.session_state[f"reviewed_{rid}"] = True
+                    st.session_state.pop(f"ai_msg_{rid}", None)
+                def do_safe(rid):
+                    st.session_state[f"override_{rid}"] = "Override to LOW RISK"
+                    st.session_state[f"ov_reason_saved_{rid}"] = "Marked safe by marketer"
+                    st.session_state[f"reviewed_{rid}"] = True
+                    st.session_state.pop(f"ai_msg_{rid}", None)
+                def do_reset(rid):
+                    for k in [f"override_{rid}", f"reviewed_{rid}", f"sent_{rid}",
+                              f"feedback_{rid}", f"ov_reason_saved_{rid}", f"ai_msg_{rid}"]:
+                        st.session_state.pop(k, None)
+
                 d1, d2, d3, d4 = st.columns(4)
-                d1.button("Approve AI", key=f"approve_{row['id']}", on_click=lambda rid=row['id']: (
-                    st.session_state.update({f"reviewed_{rid}": True})))
-                d2.button("Escalate", key=f"escalate_{row['id']}", on_click=lambda rid=row['id']: (
-                    st.session_state.update({
-                        f"override_{rid}": "Override to HIGH RISK",
-                        f"ov_reason_saved_{rid}": "Escalated by marketer",
-                        f"reviewed_{rid}": True}),
-                    st.session_state.pop(f"ai_msg_{rid}", None)))
-                d3.button("Mark Safe", key=f"safe_{row['id']}", on_click=lambda rid=row['id']: (
-                    st.session_state.update({
-                        f"override_{rid}": "Override to LOW RISK",
-                        f"ov_reason_saved_{rid}": "Marked safe by marketer",
-                        f"reviewed_{rid}": True}),
-                    st.session_state.pop(f"ai_msg_{rid}", None)))
-                d4.button("Reset", key=f"reset_{row['id']}", on_click=lambda rid=row['id']: [
-                    st.session_state.pop(k, None) for k in [
-                        f"override_{rid}", f"reviewed_{rid}", f"sent_{rid}",
-                        f"feedback_{rid}", f"ov_reason_saved_{rid}", f"ai_msg_{rid}"]])
+                d1.button("Approve AI", key=f"approve_{row['id']}", on_click=do_approve, args=(row['id'],))
+                d2.button("Escalate", key=f"escalate_{row['id']}", on_click=do_escalate, args=(row['id'],))
+                d3.button("Mark Safe", key=f"safe_{row['id']}", on_click=do_safe, args=(row['id'],))
+                d4.button("Reset", key=f"reset_{row['id']}", on_click=do_reset, args=(row['id'],))
 
                 with st.expander("View recommended actions"):
                     actions = marketer_actions(effective_prob, row["plan_type"], row["interest"], row["loyalty"])
