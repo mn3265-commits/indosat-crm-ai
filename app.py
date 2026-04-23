@@ -721,10 +721,21 @@ with tab1:
 
         for _, row in results.iterrows():
             prob = row["prob"]
-            rlabel, rcls = risk_label(prob)
 
-            risk_dot = "🔴" if prob>=0.70 else "🟠" if prob>=0.40 else "🟢"
-            with st.expander(f"{risk_dot}  {row['name']}  |  {row['plan_type']}  |  {rlabel} ({prob*100:.1f}%)"):
+            # Check override BEFORE rendering expander header
+            override_key = f"override_{row['id']}"
+            current_override = st.session_state.get(override_key, "Use AI prediction")
+            display_prob = prob
+            is_overridden = current_override != "Use AI prediction"
+            if is_overridden:
+                if "HIGH" in current_override: display_prob = 0.85
+                elif "MEDIUM" in current_override: display_prob = 0.55
+                else: display_prob = 0.20
+
+            rlabel, rcls = risk_label(display_prob)
+            risk_dot = "🔴" if display_prob>=0.70 else "🟠" if display_prob>=0.40 else "🟢"
+            override_tag = " [OVERRIDE]" if is_overridden else ""
+            with st.expander(f"{risk_dot}  {row['name']}  |  {row['plan_type']}  |  {rlabel} ({display_prob*100:.1f}%){override_tag}"):
 
                 st.markdown("")
                 p1,p2,p3,p4 = st.columns(4)
@@ -740,20 +751,12 @@ with tab1:
                 p8.metric("Complaints", f"{row['complaints']} open")
                 st.markdown("")
 
-                # ── Compute effective probability (check override first) ─
+                # ── Use effective probability from override check above ─
                 drivers = get_drivers(row)
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
-                override_key = f"override_{row['id']}"
-                current_override = st.session_state.get(override_key, "Use AI prediction")
+                effective_prob = display_prob
 
-                effective_prob = prob
-                is_overridden = current_override != "Use AI prediction"
                 if is_overridden:
-                    if "HIGH" in current_override: effective_prob = 0.85
-                    elif "MEDIUM" in current_override: effective_prob = 0.55
-                    else: effective_prob = 0.20
-
-                    # Prepend override reason as top risk driver
                     saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
                     override_driver = f"Marketer override: {saved_reason}" if saved_reason else "Marketer override (no reason given)"
                     drivers = [override_driver] + drivers
