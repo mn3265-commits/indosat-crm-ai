@@ -253,14 +253,18 @@ def generate_customers():
                   "Denpasar","Palembang","Balikpapan","Manado","Pontianak","Malang"]
     rows = []
     for i, c in enumerate(customers):
-        tenure    = random.randint(5, 720)
-        arpu      = random.randint(50000, 350000) if c["plan_type"]=="Postpaid" else random.randint(8000, 80000)
-        loyalty   = random.randint(0, 3)
-        interest  = random.randint(0, 3)
-        data_drop = random.uniform(0, 90)
-        topup     = random.randint(0, 55)
-        compl     = random.randint(0, 4)
-        netq      = round(random.uniform(1.5, 5.0), 1)
+        if i == 0:  # Agung: hardcoded high-risk profile for demo
+            tenure, arpu, loyalty, interest = 28, 52000, 0, 0
+            data_drop, topup, compl, netq = 72.0, 35, 3, 1.8
+        else:
+            tenure    = random.randint(5, 720)
+            arpu      = random.randint(50000, 350000) if c["plan_type"]=="Postpaid" else random.randint(8000, 80000)
+            loyalty   = random.randint(0, 3)
+            interest  = random.randint(0, 3)
+            data_drop = random.uniform(0, 90)
+            topup     = random.randint(0, 55)
+            compl     = random.randint(0, 4)
+            netq      = round(random.uniform(1.5, 5.0), 1)
         phone     = f"0812-{random.randint(1000,9999)}-{random.randint(1000,9999)}"
         rows.append({
             "id": f"IOH-{str(i+1).zfill(4)}",
@@ -489,33 +493,52 @@ def generate_email_content(row, prob, offer, benefit):
     today = datetime.today().strftime("%d %B %Y")
     loyalty_name = LOYALTY[row["loyalty"]]
     interest_name = INTEREST[row["interest"]]
-    postpaid_line = f"\n\nSebagai pelanggan Postpaid kami, {first} mendapatkan prioritas layanan eksklusif yang tidak tersedia untuk pelanggan umum." if row["plan_type"]=="Postpaid" else ""
+    city = row["city"]
+    plan = row["plan"]
+
+    # Build personalized context lines based on customer data
+    context_lines = []
+    if row["plan_type"] == "Postpaid":
+        context_lines.append(f"Sebagai pelanggan Postpaid ({plan}), {first} mendapatkan prioritas layanan eksklusif.")
+    if row["tenure"] <= 30:
+        context_lines.append(f"Kami tahu {first} baru bergabung {row['tenure']} hari yang lalu, dan kami ingin memastikan pengalaman terbaik sejak awal.")
+    elif row["tenure"] <= 100:
+        context_lines.append(f"Dalam {row['tenure']} hari bersama kami, kami ingin memastikan {first} mendapatkan nilai terbaik dari layanan Indosat.")
+    else:
+        context_lines.append(f"Kami sangat menghargai kesetiaan {first} selama {row['tenure']} hari bersama Indosat.")
+    if row["data_drop"] > 50:
+        context_lines.append(f"Kami memperhatikan penggunaan data {first} menurun {row['data_drop']:.0f}% bulan ini. Kami ingin membantu.")
+    if row["complaints"] >= 2:
+        context_lines.append(f"Kami juga menyadari ada {row['complaints']} keluhan yang belum terselesaikan, dan tim kami sedang memprioritaskan penyelesaiannya.")
+    if row["network"] < 2.5:
+        context_lines.append(f"Tim teknis kami sedang meningkatkan kualitas jaringan di area {city} untuk pengalaman yang lebih baik.")
+    context = "\n\n".join(context_lines)
 
     if prob >= 0.70:
-        subject = f"[Indosat] Hadiah Spesial Untukmu, {first} — Jangan Sampai Terlewat!"
+        subject = f"[Indosat] {first}, Kami Punya Sesuatu Khusus Untukmu"
         body = f"""Kepada Yth.
 {row['name']},
 
-Salam hangat dari Indosat Ooredoo Hutchison.{postpaid_line}
+Salam hangat dari Indosat Ooredoo Hutchison.
 
-Kami memperhatikan bahwa belakangan ini aktivitas penggunaan layanan kamu mengalami perubahan. Kami sangat menghargai kesetiaan kamu selama {row['tenure']} hari bersama Indosat, dan kami tidak ingin kamu melewatkan penawaran spesial ini.
+{context}
 
-Sebagai pelanggan {interest_name} yang kami hormati, kami menyiapkan:
+Sebagai pelanggan {interest_name}, kami menyiapkan penawaran yang sesuai dengan kebutuhan {first}:
 
-PENAWARAN EKSKLUSIF KHUSUS {first.upper()}:
+PENAWARAN KHUSUS UNTUK {first.upper()}:
    > {offer.upper()}
    > Manfaat: {benefit.capitalize()}.
 
-Penawaran ini hanya berlaku 48 jam dan dibuat khusus untuk kamu.
+Penawaran ini berlaku 48 jam dan dibuat khusus untuk {first}.
 
-Cara klaim mudah:
+Cara klaim:
    1. Buka aplikasi myIM3
    2. Masuk ke menu "Penawaran Spesial"
-   3. Tap "Klaim Sekarang" — GRATIS, tanpa syarat tambahan
+   3. Tap "Klaim Sekarang"
 
-Atau balas email ini dengan kata YA dan tim kami akan memproses klaim kamu langsung.
+Atau balas email ini dengan kata YA dan tim kami akan memproses klaim langsung.
 
-Kami tidak ingin kehilangan kamu, {first}. Kamu adalah bagian penting dari keluarga Indosat.
+Kami di sini untuk {first}. Jangan ragu menghubungi kami kapan saja.
 
 Salam hangat,
 Tim Retensi Pelanggan
@@ -527,26 +550,26 @@ Email: care@indosatooredoo.com
 myIM3: indosatooredoo.com/myim3"""
 
     elif prob >= 0.40:
-        subject = f"[Indosat] {first}, Ada Penawaran Upgrade Eksklusif Khusus Untukmu!"
+        subject = f"[Indosat] Penawaran Upgrade Eksklusif untuk {first}"
         body = f"""Kepada Yth.
 {row['name']},
 
-Halo {first}! Salam dari Indosat Ooredoo Hutchison.{postpaid_line}
+Halo {first}! Salam dari Indosat Ooredoo Hutchison.
 
-Sebagai pelanggan {loyalty_name} yang sudah bersama kami selama {row['tenure']} hari, kamu berhak mendapatkan akses ke penawaran upgrade eksklusif yang tidak tersedia untuk umum.
+{context}
 
-Kami telah menganalisis kebiasaan penggunaan kamu sebagai {interest_name} dan menyiapkan penawaran terbaik:
+Sebagai pelanggan {loyalty_name} dan {interest_name}, kami menyiapkan penawaran upgrade yang tepat untuk {first}:
 
-PENAWARAN UPGRADE EKSKLUSIF UNTUK {first.upper()}:
-   > Dapatkan {offer}
+UPGRADE EKSKLUSIF:
+   > {offer.capitalize()}
    > Manfaat: {benefit.capitalize()}.
 
 Cara aktivasi:
    1. Buka aplikasi myIM3
    2. Pilih menu "Upgrade Paket"
-   3. Pilih paket rekomendasi dan nikmati manfaatnya langsung
+   3. Pilih paket rekomendasi dan nikmati manfaatnya
 
-Penawaran ini hanya tersedia 7 hari ke depan, khusus untuk {first}.
+Penawaran ini tersedia 7 hari ke depan, khusus untuk {first}.
 
 Salam,
 Tim Customer Experience
@@ -557,26 +580,28 @@ Hubungi kami: 185
 Email: care@indosatooredoo.com"""
 
     else:
-        subject = f"[Indosat] Terima Kasih, {first}! Hadiah Loyalitas Menantimu"
+        subject = f"[Indosat] Terima Kasih, {first}! Hadiah Loyalitas untuk Pelanggan {loyalty_name}"
         body = f"""Kepada Yth.
 {row['name']},
 
-Halo {first}! Terima kasih telah menjadi pelanggan setia Indosat selama {row['tenure']} hari.{postpaid_line}
+Halo {first}! Terima kasih telah menjadi pelanggan setia Indosat.
 
-Kesetiaan kamu sangat berarti bagi kami. Sebagai pelanggan {loyalty_name}, kamu adalah bagian dari kelompok pelanggan terbaik Indosat.
+{context}
 
-HADIAH LOYALITAS BULAN INI UNTUK {first.upper()}:
+Sebagai pelanggan {loyalty_name}, {first} berhak atas hadiah istimewa bulan ini:
+
+HADIAH LOYALITAS:
    > Poin reward ekstra 2x lipat untuk semua transaksi
    > Akses prioritas ke penawaran eksklusif member {loyalty_name}
 
-Tukarkan poin kamu untuk mendapatkan kuota data tambahan, diskon tagihan, atau voucher belanja partner Indosat.
+Tukarkan poin untuk kuota data, diskon tagihan, atau voucher belanja partner Indosat.
 
 Cara tukar poin:
    1. Buka aplikasi myIM3
    2. Pilih menu "Poin & Reward"
-   3. Pilih hadiah favoritmu
+   3. Pilih hadiah favorit {first}
 
-Terima kasih, {first}. Kami berkomitmen memberikan yang terbaik untukmu.
+Terima kasih telah bersama kami. Kami berkomitmen memberikan yang terbaik.
 
 Salam,
 Tim Loyalty & Rewards
@@ -590,26 +615,42 @@ Email: care@indosatooredoo.com"""
 
 def generate_call_script(row, prob, offer, benefit):
     first = row["name"].split()[0]
+    interest_name = INTEREST[row["interest"]]
+    loyalty_name = LOYALTY[row["loyalty"]]
+
+    # Build personalized opening based on customer situation
+    if row["data_drop"] > 50 and row["complaints"] >= 2:
+        situation = (f"Kami memperhatikan penggunaan data Anda menurun {row['data_drop']:.0f}% "
+                     f"dan ada {row['complaints']} keluhan yang belum terselesaikan. "
+                     f"Kami ingin membantu menyelesaikan masalah ini.")
+    elif row["data_drop"] > 50:
+        situation = f"Kami memperhatikan penggunaan data Anda menurun akhir-akhir ini. Kami ingin memastikan semuanya baik-baik saja."
+    elif row["tenure"] <= 30:
+        situation = f"Sebagai pelanggan baru yang bergabung {row['tenure']} hari lalu, kami ingin memastikan pengalaman terbaik untuk Anda."
+    elif row["complaints"] >= 2:
+        situation = f"Kami menyadari ada {row['complaints']} keluhan yang belum terselesaikan. Tim kami sedang memprioritaskan ini."
+    else:
+        situation = f"Sebagai pelanggan {loyalty_name} selama {row['tenure']} hari, Anda sangat penting bagi kami."
+
     if prob >= 0.70:
-        return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison. "
-                f"Kami ingin menyampaikan penawaran spesial khusus untuk Anda. "
-                f"Sebagai pelanggan setia selama {row['tenure']} hari, Anda berhak mendapatkan {offer}. "
-                f"Penawaran ini berlaku 48 jam. "
-                f"Untuk klaim, silakan buka aplikasi my IM3, masuk ke menu Penawaran Spesial, "
-                f"dan tap Klaim Sekarang. "
-                f"Jika ada pertanyaan, hubungi kami di 185.")
+        return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison, menghubungi dari {row['city']}. "
+                f"{situation} "
+                f"Untuk itu, kami menyiapkan penawaran khusus: {offer}. "
+                f"Penawaran ini berlaku 48 jam dan hanya untuk {first}. "
+                f"Silakan buka aplikasi my IM3, masuk ke Penawaran Spesial, dan tap Klaim Sekarang. "
+                f"Atau hubungi kami kembali di 185. Terima kasih, {first}.")
     elif prob >= 0.40:
         return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison. "
-                f"Ada penawaran upgrade eksklusif untuk Anda: {offer}. "
-                f"Manfaatnya adalah {benefit}. "
-                f"Penawaran berlaku 7 hari ke depan. "
-                f"Aktifkan di aplikasi my IM3, menu Upgrade Paket. "
-                f"Hubungi kami di 185 untuk informasi lebih lanjut.")
+                f"{situation} "
+                f"Kami punya penawaran upgrade yang cocok untuk {first} sebagai {interest_name}: {offer}. "
+                f"Manfaatnya: {benefit}. Berlaku 7 hari. "
+                f"Aktifkan di my IM3, menu Upgrade Paket. "
+                f"Terima kasih, {first}.")
     else:
         return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison. "
-                f"Terima kasih telah menjadi pelanggan setia selama {row['tenure']} hari. "
-                f"Sebagai hadiah loyalitas, Anda mendapatkan poin reward 2 kali lipat untuk semua transaksi. "
-                f"Tukarkan poin Anda di aplikasi my IM3, menu Poin dan Reward. "
+                f"{situation} "
+                f"Sebagai ucapan terima kasih, kami berikan poin reward 2 kali lipat bulan ini. "
+                f"Tukarkan di my IM3, menu Poin dan Reward, untuk kuota data atau diskon tagihan. "
                 f"Terima kasih, {first}. Kami senang Anda bersama kami.")
 
 # ── Indosat Styling ───────────────────────────────────────────────────────────
