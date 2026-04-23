@@ -14,6 +14,12 @@ try:
 except ImportError:
     TWILIO_AVAILABLE = False
 
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
+
 st.set_page_config(page_title="Indosat CRM AI", layout="wide")
 
 # ── Sidebar Credentials ───────────────────────────────────────────────────────
@@ -32,6 +38,7 @@ _GMAIL_APP_PASS  = _get_secret("GMAIL_APP_PASSWORD", "")
 _TWILIO_SID      = _get_secret("TWILIO_SID", "")
 _TWILIO_TOKEN    = _get_secret("TWILIO_TOKEN", "")
 _TWILIO_WA_FROM  = _get_secret("TWILIO_WA_FROM", "whatsapp:+14155238886")
+_ANTHROPIC_KEY   = _get_secret("ANTHROPIC_API_KEY", "")
 
 with st.sidebar:
     st.markdown("### API Configuration")
@@ -46,6 +53,17 @@ with st.sidebar:
         st.success("Twilio credentials loaded")
     else:
         st.warning("Twilio credentials not configured")
+
+    if _ANTHROPIC_KEY and ANTHROPIC_AVAILABLE:
+        st.success("Claude AI connected")
+    elif not ANTHROPIC_AVAILABLE:
+        st.warning("anthropic library not installed")
+    else:
+        st.warning("Claude API key not configured")
+
+    st.markdown("---")
+    st.markdown("**Claude AI (Generative)**")
+    anthropic_key = st.text_input("Anthropic API Key", value=_ANTHROPIC_KEY, type="password", placeholder="sk-ant-...")
 
     st.markdown("---")
     st.markdown("**Gmail SMTP**")
@@ -86,6 +104,85 @@ def send_whatsapp(to_number, message, sid, token, from_number):
         return True, "WhatsApp message sent successfully."
     except Exception as e:
         return False, str(e)
+
+# ── Claude AI message generation ──────────────────────────────────────────────
+def generate_with_claude(row, prob, drivers, offer, benefit, api_key):
+    """Call Claude API to generate personalized retention messages.
+    Returns (email_subject, email_body, whatsapp_msg) or None on failure."""
+    if not ANTHROPIC_AVAILABLE or not api_key:
+        return None
+
+    first = row["name"].split()[0]
+    if prob >= 0.70:
+        urgency = "HIGH RISK - urgent retention needed within 24 hours"
+    elif prob >= 0.40:
+        urgency = "MEDIUM RISK - upsell/engagement opportunity within 3 days"
+    else:
+        urgency = "LOW RISK - loyalty reward and cross-sell opportunity"
+
+    prompt = f"""You are a CRM retention copywriter for Indosat Ooredoo Hutchison, Indonesia's major telecom operator.
+
+Write TWO personalized retention messages in Bahasa Indonesia for this subscriber:
+
+CUSTOMER PROFILE:
+- Name: {row['name']}
+- Plan: {row['plan']} ({row['plan_type']})
+- City: {row['city']}
+- Tenure: {row['tenure']} days
+- ARPU: Rp {row['arpu']:,}/month
+- Loyalty tier: {LOYALTY[row['loyalty']]}
+- Interest segment: {INTEREST[row['interest']]}
+- Churn probability: {prob*100:.1f}%
+- Risk level: {urgency}
+- Top risk drivers: {'; '.join(drivers)}
+- Recommended offer: {offer}
+- Offer benefit: {benefit}
+
+OUTPUT FORMAT (follow exactly):
+===EMAIL_SUBJECT===
+[one line subject]
+===EMAIL_BODY===
+[full email body, professional but warm, address the customer by first name, mention the offer, include call to action via myIM3 app, sign off as the appropriate Indosat team]
+===WHATSAPP===
+[shorter WhatsApp message, use *bold* for emphasis, casual but professional tone, include the offer and call to action]
+
+RULES:
+- Write entirely in Bahasa Indonesia
+- Be warm and personal, not corporate-speak
+- Reference specific customer data (tenure, city, plan) to show personalization
+- The offer should feel exclusive and time-limited
+- Do not use emojis
+- Do not use em-dashes"""
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20241022",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        text = response.content[0].text
+
+        parts = {}
+        for section in ["EMAIL_SUBJECT", "EMAIL_BODY", "WHATSAPP"]:
+            marker = f"==={section}==="
+            if marker in text:
+                start = text.index(marker) + len(marker)
+                # Find next marker or end
+                next_markers = [f"==={s}===" for s in ["EMAIL_SUBJECT","EMAIL_BODY","WHATSAPP"] if s != section]
+                end = len(text)
+                for nm in next_markers:
+                    if nm in text[start:]:
+                        candidate = start + text[start:].index(nm)
+                        if candidate < end:
+                            end = candidate
+                parts[section] = text[start:end].strip()
+
+        if all(k in parts for k in ["EMAIL_SUBJECT","EMAIL_BODY","WHATSAPP"]):
+            return parts["EMAIL_SUBJECT"], parts["EMAIL_BODY"], parts["WHATSAPP"]
+        return None
+    except Exception:
+        return None
 
 # ── Synthetic customer database ───────────────────────────────────────────────
 @st.cache_resource
@@ -653,10 +750,39 @@ with tab1:
                 st.markdown("")
 
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
+
+                # Default: rule-based templates
                 subject, email_body = generate_email_content(row, prob, offer, benefit)
                 wa_msg = generate_whatsapp(row, prob, offer, benefit)
+                msg_source = "Rule-based template"
+
+                # Session state key for AI-generated messages
+                ai_key = f"ai_msg_{row['id']}"
+
+                # If AI messages were previously generated, use them
+                if ai_key in st.session_state:
+                    subject = st.session_state[ai_key]["subject"]
+                    email_body = st.session_state[ai_key]["email"]
+                    wa_msg = st.session_state[ai_key]["whatsapp"]
+                    msg_source = "Generated by Claude AI"
 
                 st.markdown("**Personalized Messages**")
+
+                # Claude AI generation button
+                if anthropic_key and ANTHROPIC_AVAILABLE:
+                    if st.button("Generate with Claude AI", key=f"ai_{row['id']}"):
+                        with st.spinner("Claude is writing personalized messages..."):
+                            result = generate_with_claude(row, prob, drivers, offer, benefit, anthropic_key)
+                        if result:
+                            subject, email_body, wa_msg = result
+                            st.session_state[ai_key] = {"subject": subject, "email": email_body, "whatsapp": wa_msg}
+                            msg_source = "Generated by Claude AI"
+                            st.rerun()
+                        else:
+                            st.error("Claude generation failed. Using template fallback.")
+
+                st.caption(f"Source: {msg_source}")
+
                 mt1, mt2 = st.tabs(["Email", "WhatsApp"])
 
                 with mt1:
