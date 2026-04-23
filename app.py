@@ -8,27 +8,148 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# Twilio — install via: pip install twilio
 try:
     from twilio.rest import Client as TwilioClient
     TWILIO_AVAILABLE = True
 except ImportError:
     TWILIO_AVAILABLE = False
 
-st.set_page_config(page_title="Indosat CRM AI", page_icon="📡", layout="wide")
+st.set_page_config(page_title="Indosat CRM AI", page_icon="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23EB1C24' width='100' height='100' rx='20'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>I</text></svg>", layout="wide")
+
+# ── Indosat Brand Styling ─────────────────────────────────────────────────────
+st.markdown("""
+<style>
+    /* Header bar */
+    header[data-testid="stHeader"] {
+        background-color: #EB1C24;
+    }
+
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0px;
+        border-bottom: 3px solid #EB1C24;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 10px 24px;
+        font-weight: 600;
+        color: #555;
+    }
+    .stTabs [aria-selected="true"] {
+        color: #EB1C24 !important;
+        border-bottom: 3px solid #EB1C24;
+    }
+
+    /* Metric cards */
+    [data-testid="stMetric"] {
+        background: #f8f9fa;
+        border-left: 4px solid #EB1C24;
+        padding: 12px 16px;
+        border-radius: 4px;
+    }
+    [data-testid="stMetricLabel"] {
+        font-size: 0.8rem;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    [data-testid="stMetricValue"] {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #1a1a1a;
+    }
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    /* Buttons */
+    .stButton > button {
+        background-color: #EB1C24;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-weight: 600;
+    }
+    .stButton > button:hover {
+        background-color: #c4161d;
+        color: white;
+    }
+
+    /* Title area */
+    .brand-header {
+        background: linear-gradient(135deg, #EB1C24 0%, #c4161d 100%);
+        color: white;
+        padding: 24px 32px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+    }
+    .brand-header h1 {
+        color: white;
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+    .brand-header p {
+        color: rgba(255,255,255,0.85);
+        margin: 4px 0 0 0;
+        font-size: 0.95rem;
+    }
+
+    /* Section headers */
+    .section-header {
+        color: #EB1C24;
+        font-weight: 700;
+        font-size: 1.1rem;
+        border-bottom: 2px solid #EB1C24;
+        padding-bottom: 6px;
+        margin-top: 20px;
+        margin-bottom: 12px;
+    }
+
+    /* Risk badges */
+    .risk-high { color: #dc3545; font-weight: 700; }
+    .risk-med { color: #e67e22; font-weight: 700; }
+    .risk-low { color: #27ae60; font-weight: 700; }
+
+    /* Pass/fail badges */
+    .pass-badge {
+        background: #d4edda; color: #155724;
+        padding: 2px 10px; border-radius: 12px;
+        font-weight: 600; font-size: 0.85rem;
+    }
+    .fail-badge {
+        background: #f8d7da; color: #721c24;
+        padding: 2px 10px; border-radius: 12px;
+        font-weight: 600; font-size: 0.85rem;
+    }
+
+    /* Clean dividers */
+    hr { border: none; border-top: 1px solid #e0e0e0; margin: 20px 0; }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: #1a1a1a;
+    }
+    [data-testid="stSidebar"] * {
+        color: #e0e0e0 !important;
+    }
+    [data-testid="stSidebar"] .stTextInput label {
+        color: #aaa !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ── Sidebar Credentials ───────────────────────────────────────────────────────
 import os
 
-# Load from Streamlit Cloud secrets OR Replit env vars, fallback to sidebar input
 def _get_secret(key, default=""):
-    # Try Streamlit Cloud secrets first
     try:
         if key in st.secrets:
             return st.secrets[key]
     except Exception:
         pass
-    # Fallback to Replit / local env vars
     return os.environ.get(key, default)
 
 _GMAIL_ADDRESS   = _get_secret("GMAIL_ADDRESS", "agung.technology.management@gmail.com")
@@ -38,32 +159,32 @@ _TWILIO_TOKEN    = _get_secret("TWILIO_TOKEN", "")
 _TWILIO_WA_FROM  = _get_secret("TWILIO_WA_FROM", "whatsapp:+14155238886")
 
 with st.sidebar:
-    st.title("⚙️ API Configuration")
+    st.markdown("### API Configuration")
     st.markdown("---")
 
     if _GMAIL_APP_PASS:
-        st.success("✅ Gmail credentials loaded from Secrets")
+        st.success("Gmail credentials loaded")
     else:
-        st.warning("⚠️ Gmail App Password not found in Secrets")
+        st.warning("Gmail App Password not configured")
 
     if _TWILIO_SID and _TWILIO_TOKEN:
-        st.success("✅ Twilio credentials loaded from Secrets")
+        st.success("Twilio credentials loaded")
     else:
-        st.warning("⚠️ Twilio credentials not found in Secrets")
+        st.warning("Twilio credentials not configured")
 
     st.markdown("---")
-    st.markdown("### 📧 Gmail SMTP (override)")
+    st.markdown("**Gmail SMTP**")
     sender_email   = st.text_input("Your Gmail", value=_GMAIL_ADDRESS)
     gmail_app_pass = st.text_input("Gmail App Password", value=_GMAIL_APP_PASS, type="password", placeholder="Leave blank if using Secrets")
 
     st.markdown("---")
-    st.markdown("### 💬 Twilio WhatsApp (override)")
+    st.markdown("**Twilio WhatsApp**")
     twilio_sid     = st.text_input("Twilio Account SID", value=_TWILIO_SID, type="password")
     twilio_token   = st.text_input("Twilio Auth Token", value=_TWILIO_TOKEN, type="password")
     twilio_wa_from = st.text_input("Twilio WhatsApp Number", value=_TWILIO_WA_FROM)
 
     st.markdown("---")
-    st.caption("Credentials load automatically from Streamlit Cloud Secrets or Replit Secrets. Sidebar fields are for manual override only.")
+    st.caption("Credentials load automatically from Streamlit Cloud Secrets. Sidebar fields are for manual override only.")
 
 # ── Send functions ────────────────────────────────────────────────────────────
 def send_email(to_email, subject, body, sender, app_password):
@@ -204,22 +325,25 @@ df    = generate_customers()
 model = train_model()
 eval_metrics = evaluate_model_metrics()
 
-LOYALTY       = ["Bronze","Silver","Gold","Platinum"]
-LOYALTY_ICON  = ["🥉","🥈","🥇","💎"]
-INTEREST      = ["Data Streamer","Social Media","Gamer","Business User"]
-INTEREST_ICON = ["📺","📱","🎮","💼"]
+LOYALTY  = ["Bronze","Silver","Gold","Platinum"]
+INTEREST = ["Data Streamer","Social Media","Gamer","Business User"]
 
 def tseg(d):
-    if d<=30:    return "New (0-30d)","🔴"
-    elif d<=100: return "Early (31-100d)","🟠"
-    elif d<=360: return "Growing (101-360d)","🟡"
-    else:        return "Loyal (>360d)","🟢"
+    if d<=30:    return "New (0-30d)"
+    elif d<=100: return "Early (31-100d)"
+    elif d<=360: return "Growing (101-360d)"
+    else:        return "Loyal (>360d)"
 
 def aseg(a):
-    if a<20000:    return "Low (<20k)","🔴"
-    elif a<75000:  return "Mid (20-75k)","🟡"
-    elif a<200000: return "High (75-200k)","🟢"
-    else:          return "Premium (>200k)","🟢"
+    if a<20000:    return "Low (<20k)"
+    elif a<75000:  return "Mid (20-75k)"
+    elif a<200000: return "High (75-200k)"
+    else:          return "Premium (>200k)"
+
+def risk_label(prob):
+    if prob>=0.70: return "HIGH RISK","risk-high"
+    elif prob>=0.40: return "MEDIUM","risk-med"
+    else: return "LOW RISK","risk-low"
 
 def get_drivers(row):
     f=[]
@@ -246,23 +370,23 @@ def get_offer(interest, plan_type):
 def marketer_actions(prob, plan_type, interest, loyalty):
     actions = []
     if prob >= 0.70:
-        actions.append("🚨 URGENT: Send retention offer within 24 hours via Email + WhatsApp")
-        actions.append("📞 Schedule personal call from retention team if no response in 48h")
-        actions.append("💰 Offer loyalty discount (10–20% off next bill) as last resort")
+        actions.append("URGENT — Send retention offer within 24 hours via Email + WhatsApp")
+        actions.append("Schedule personal call from retention team if no response in 48h")
+        actions.append("Offer loyalty discount (10-20% off next bill) as last resort")
         if plan_type == "Postpaid":
-            actions.append("⭐ Postpaid priority: Escalate to senior retention team — higher LTV customer")
+            actions.append("Postpaid priority: Escalate to senior retention team (higher LTV)")
     elif prob >= 0.40:
-        actions.append("📈 UPSELL: Target with plan upgrade or add-on offer within 3 days")
-        actions.append("🎁 Send loyalty points reward to re-engage the customer")
-        actions.append("📊 Monitor usage weekly — escalate to HIGH RISK if data drop continues")
+        actions.append("UPSELL — Target with plan upgrade or add-on offer within 3 days")
+        actions.append("Send loyalty points reward to re-engage the customer")
+        actions.append("Monitor usage weekly — escalate to HIGH RISK if data drop continues")
         if plan_type == "Postpaid":
-            actions.append("⭐ Postpaid upsell path: push to Platinum or Family Plan tier")
+            actions.append("Postpaid upsell: push to Platinum or Family Plan tier")
     else:
-        actions.append("🌟 LOYALTY: Reward with bonus points or exclusive member benefit")
-        actions.append("📣 CROSS-SELL: Offer family plan, device bundle, or add-on service")
-        actions.append("📅 Re-engage quarterly with VIP newsletter or early access to new plans")
+        actions.append("LOYALTY — Reward with bonus points or exclusive member benefit")
+        actions.append("CROSS-SELL — Offer family plan, device bundle, or add-on service")
+        actions.append("Re-engage quarterly with VIP newsletter or early access to new plans")
         if plan_type == "Postpaid":
-            actions.append("⭐ Postpaid cross-sell: Introduce Postpaid Family Plan to increase ARPU")
+            actions.append("Postpaid cross-sell: Introduce Family Plan to increase ARPU")
     return actions
 
 def generate_email_content(row, prob, offer, benefit):
@@ -270,9 +394,7 @@ def generate_email_content(row, prob, offer, benefit):
     today = datetime.today().strftime("%d %B %Y")
     loyalty_name = LOYALTY[row["loyalty"]]
     interest_name = INTEREST[row["interest"]]
-    postpaid_line = f"""
-
-Sebagai pelanggan Postpaid kami, {first} mendapatkan prioritas layanan eksklusif yang tidak tersedia untuk pelanggan umum.""" if row["plan_type"]=="Postpaid" else ""
+    postpaid_line = f"\n\nSebagai pelanggan Postpaid kami, {first} mendapatkan prioritas layanan eksklusif yang tidak tersedia untuk pelanggan umum." if row["plan_type"]=="Postpaid" else ""
 
     if prob >= 0.70:
         subject = f"[Indosat] Hadiah Spesial Untukmu, {first} — Jangan Sampai Terlewat!"
@@ -285,9 +407,9 @@ Kami memperhatikan bahwa belakangan ini aktivitas penggunaan layanan kamu mengal
 
 Sebagai pelanggan {interest_name} yang kami hormati, kami menyiapkan:
 
-✨ PENAWARAN EKSKLUSIF KHUSUS {first.upper()}:
-   ➜ {offer.upper()}
-   ➜ Manfaat: {benefit.capitalize()}.
+PENAWARAN EKSKLUSIF KHUSUS {first.upper()}:
+   > {offer.upper()}
+   > Manfaat: {benefit.capitalize()}.
 
 Penawaran ini hanya berlaku 48 jam dan dibuat khusus untuk kamu.
 
@@ -304,7 +426,7 @@ Salam hangat,
 Tim Retensi Pelanggan
 Indosat Ooredoo Hutchison
 {today}
-────────────────────────
+---
 Hubungi kami: 185
 Email: care@indosatooredoo.com
 myIM3: indosatooredoo.com/myim3"""
@@ -320,9 +442,9 @@ Sebagai pelanggan {loyalty_name} yang sudah bersama kami selama {row['tenure']} 
 
 Kami telah menganalisis kebiasaan penggunaan kamu sebagai {interest_name} dan menyiapkan penawaran terbaik:
 
-🚀 PENAWARAN UPGRADE EKSKLUSIF UNTUK {first.upper()}:
-   ➜ Dapatkan {offer}
-   ➜ Manfaat: {benefit.capitalize()}.
+PENAWARAN UPGRADE EKSKLUSIF UNTUK {first.upper()}:
+   > Dapatkan {offer}
+   > Manfaat: {benefit.capitalize()}.
 
 Cara aktivasi:
    1. Buka aplikasi myIM3
@@ -335,12 +457,12 @@ Salam,
 Tim Customer Experience
 Indosat Ooredoo Hutchison
 {today}
-────────────────────────
+---
 Hubungi kami: 185
 Email: care@indosatooredoo.com"""
 
     else:
-        subject = f"[Indosat] Terima Kasih, {first}! Hadiah Loyalitas Menantimu 🎁"
+        subject = f"[Indosat] Terima Kasih, {first}! Hadiah Loyalitas Menantimu"
         body = f"""Kepada Yth.
 {row['name']},
 
@@ -348,9 +470,9 @@ Halo {first}! Terima kasih telah menjadi pelanggan setia Indosat selama {row['te
 
 Kesetiaan kamu sangat berarti bagi kami. Sebagai pelanggan {loyalty_name}, kamu adalah bagian dari kelompok pelanggan terbaik Indosat.
 
-🎁 HADIAH LOYALITAS BULAN INI UNTUK {first.upper()}:
-   ➜ Poin reward ekstra 2x lipat untuk semua transaksi
-   ➜ Akses prioritas ke penawaran eksklusif member {loyalty_name}
+HADIAH LOYALITAS BULAN INI UNTUK {first.upper()}:
+   > Poin reward ekstra 2x lipat untuk semua transaksi
+   > Akses prioritas ke penawaran eksklusif member {loyalty_name}
 
 Tukarkan poin kamu untuk mendapatkan kuota data tambahan, diskon tagihan, atau voucher belanja partner Indosat.
 
@@ -365,7 +487,7 @@ Salam,
 Tim Loyalty & Rewards
 Indosat Ooredoo Hutchison
 {today}
-────────────────────────
+---
 Hubungi kami: 185
 Email: care@indosatooredoo.com"""
 
@@ -374,69 +496,72 @@ Email: care@indosatooredoo.com"""
 def generate_whatsapp(row, prob, offer, benefit):
     first = row["name"].split()[0]
     if prob >= 0.70:
-        return f"""Halo *{first}*! 👋
+        return f"""Halo *{first}*!
 
 Kami dari *Indosat Ooredoo Hutchison* ingin menyampaikan penawaran spesial yang kami siapkan khusus untukmu.
 
-🎁 *HADIAH EKSKLUSIF UNTUKMU:*
-✅ {offer.capitalize()}
-✅ {benefit.capitalize()}
+*HADIAH EKSKLUSIF UNTUKMU:*
+- {offer.capitalize()}
+- {benefit.capitalize()}
 
 Penawaran ini hanya berlaku *48 jam* dan khusus untuk {first} saja.
 
 Cara klaim:
-1️⃣ Buka aplikasi myIM3
-2️⃣ Masuk ke "Penawaran Spesial"
-3️⃣ Tap *Klaim Sekarang*
+1. Buka aplikasi myIM3
+2. Masuk ke "Penawaran Spesial"
+3. Tap *Klaim Sekarang*
 
-Atau balas pesan ini dengan *YA* dan tim kami siap membantu! 😊
+Atau balas pesan ini dengan *YA* dan tim kami siap membantu!
 
-_Indosat Care · 185_"""
+_Indosat Care - 185_"""
 
     elif prob >= 0.40:
-        return f"""Halo *{first}*! 👋
+        return f"""Halo *{first}*!
 
 Ada kabar baik dari *Indosat Ooredoo Hutchison* khusus untukmu!
 
-🚀 *PENAWARAN UPGRADE EKSKLUSIF:*
-✅ {offer.capitalize()}
-✅ {benefit.capitalize()}
+*PENAWARAN UPGRADE EKSKLUSIF:*
+- {offer.capitalize()}
+- {benefit.capitalize()}
 
 Penawaran ini tersedia *7 hari ke depan* dan hanya untuk {first}.
 
-Aktifkan sekarang di aplikasi *myIM3* → menu Upgrade Paket.
+Aktifkan sekarang di aplikasi *myIM3* > menu Upgrade Paket.
 
-Ada pertanyaan? Balas pesan ini ya! 😊
+Ada pertanyaan? Balas pesan ini ya!
 
-_Indosat Care · 185_"""
+_Indosat Care - 185_"""
 
     else:
-        return f"""Halo *{first}*! 🌟
+        return f"""Halo *{first}*!
 
 Terima kasih sudah setia bersama *Indosat* selama {row['tenure']} hari!
 
-🎁 *HADIAH LOYALITAS BULAN INI:*
-✅ Poin reward 2x lipat untuk semua transaksi
-✅ Akses eksklusif penawaran member
+*HADIAH LOYALITAS BULAN INI:*
+- Poin reward 2x lipat untuk semua transaksi
+- Akses eksklusif penawaran member
 
-Tukar poinmu sekarang di *myIM3* → menu Poin & Reward.
+Tukar poinmu sekarang di *myIM3* > menu Poin & Reward.
 
-Terima kasih, {first}! Kami senang kamu bersama kami. 💙
+Terima kasih, {first}! Kami senang kamu bersama kami.
 
-_Indosat Care · 185_"""
+_Indosat Care - 185_"""
 
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
-st.title("📡 Indosat CRM AI — Customer Intelligence Platform")
-st.caption("AI-powered churn prediction · Personalized Email & WhatsApp · Marketer action guide")
-st.markdown("---")
+st.markdown("""
+<div class="brand-header">
+    <h1>Indosat CRM AI</h1>
+    <p>Customer Intelligence Platform — AI-powered churn prediction and personalized retention</p>
+</div>
+""", unsafe_allow_html=True)
 
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Dashboard", "🔍 Search & Predict", "📋 All Customers",
-    "📈 Model Evaluation", "🏗️ AI Architecture"])
+    "Dashboard", "Search & Predict", "All Customers",
+    "Model Evaluation", "AI Architecture"])
 
 # ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
 with tab0:
-    st.subheader("Executive Summary")
+    st.markdown('<div class="section-header">Executive Summary</div>', unsafe_allow_html=True)
 
     Xi_all = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     probs_all = model.predict_proba(Xi_all)[:,1]
@@ -455,27 +580,26 @@ with tab0:
     d5.metric("Postpaid / Prepaid", f"{n_post} / {n_pre}")
 
     st.markdown("---")
-
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.markdown("#### Risk Distribution")
+        st.markdown('<div class="section-header">Risk Distribution</div>', unsafe_allow_html=True)
         risk_df = pd.DataFrame({
             "Risk Level": ["High (>=70%)", "Medium (40-70%)", "Low (<40%)"],
             "Count": [n_high, n_med, n_low]
         }).set_index("Risk Level")
-        st.bar_chart(risk_df)
+        st.bar_chart(risk_df, color="#EB1C24")
 
     with col_right:
-        st.markdown("#### Feature Importance")
+        st.markdown('<div class="section-header">Feature Importance</div>', unsafe_allow_html=True)
         feat_df = pd.DataFrame({
             "Feature": eval_metrics["features"],
             "Importance": eval_metrics["importances"]
         }).sort_values("Importance", ascending=False).set_index("Feature")
-        st.bar_chart(feat_df)
+        st.bar_chart(feat_df, color="#FEDD00")
 
     st.markdown("---")
-    st.markdown("#### Model Performance (Test Set)")
+    st.markdown('<div class="section-header">Model Performance (Test Set)</div>', unsafe_allow_html=True)
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
     k2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
@@ -484,20 +608,21 @@ with tab0:
     k5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
 
     st.markdown("---")
-    st.markdown("#### Hybrid AI Architecture")
+    st.markdown('<div class="section-header">Hybrid AI Architecture</div>', unsafe_allow_html=True)
     st.info(
         "**Predictive AI** — GradientBoostingClassifier scores churn risk per subscriber.  \n"
         "**Generative AI** — Anthropic Claude Sonnet 4.5 generates personalized Bahasa Indonesia retention messages.  \n"
         "**Delivery** — Email (Gmail SMTP) + WhatsApp (Twilio API) with rule-based template fallback."
     )
 
+# ── Tab 1: Search & Predict ──────────────────────────────────────────────────
 with tab1:
-    st.subheader("Search Customer")
+    st.markdown('<div class="section-header">Search Customer</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns([2,1,1])
     with c1:
-        search = st.text_input("Search by name, email, WhatsApp, or ID", placeholder="e.g. Budi, gmail, IOH-0003...")
+        search = st.text_input("Search by name, email, WhatsApp, or ID", placeholder="e.g. Agung, gmail, IOH-0003...")
     with c2:
-        filter_risk = st.selectbox("Risk Level", ["All","🔴 High Risk (>70%)","🟠 Medium (40-70%)","🟢 Low Risk (<40%)"])
+        filter_risk = st.selectbox("Risk Level", ["All","High Risk (>70%)","Medium (40-70%)","Low Risk (<40%)"])
     with c3:
         filter_plan = st.selectbox("Plan Type", ["All","Postpaid","Prepaid"])
 
@@ -519,55 +644,51 @@ with tab1:
         results = results.copy()
         results["prob"] = probs
 
-        if filter_risk == "🔴 High Risk (>70%)":    results = results[results["prob"]>=0.70]
-        elif filter_risk == "🟠 Medium (40-70%)":   results = results[(results["prob"]>=0.40)&(results["prob"]<0.70)]
-        elif filter_risk == "🟢 Low Risk (<40%)":   results = results[results["prob"]<0.40]
+        if filter_risk == "High Risk (>70%)":    results = results[results["prob"]>=0.70]
+        elif filter_risk == "Medium (40-70%)":   results = results[(results["prob"]>=0.40)&(results["prob"]<0.70)]
+        elif filter_risk == "Low Risk (<40%)":   results = results[results["prob"]<0.40]
 
         st.markdown(f"**{len(results)} customer(s) found**")
 
         for _, row in results.iterrows():
             prob = row["prob"]
-            if prob>=0.70:   risk_icon,risk_text="🔴","HIGH RISK — Churn Prevention"
-            elif prob>=0.40: risk_icon,risk_text="🟠","MEDIUM RISK — ARPU Growth"
-            else:            risk_icon,risk_text="🟢","LOW RISK — Loyalty Reward"
-            plan_badge = "🏢 Postpaid" if row["plan_type"]=="Postpaid" else "📦 Prepaid"
+            rlabel, rcls = risk_label(prob)
 
-            with st.expander(f"{risk_icon} {row['name']} · {row['email']} · {plan_badge} · {risk_text} ({prob*100:.1f}%)"):
+            with st.expander(f"{row['name']}  |  {row['email']}  |  {row['plan_type']}  |  {rlabel} ({prob*100:.1f}%)"):
 
-                st.markdown("### 👤 Customer Profile")
+                st.markdown('<div class="section-header">Customer Profile</div>', unsafe_allow_html=True)
                 p1,p2,p3,p4,p5 = st.columns(5)
                 p1.metric("ID", row["id"])
                 p2.metric("Email", row["email"])
                 p3.metric("WhatsApp", row["whatsapp"])
                 p4.metric("City", row["city"])
-                p5.metric("Plan Type", plan_badge)
+                p5.metric("Plan Type", row["plan_type"])
 
                 p6,p7,p8,p9,p10 = st.columns(5)
-                tl,_ = tseg(row["tenure"]); al,_ = aseg(row["arpu"])
                 p6.metric("Active Plan", row["plan"])
-                p7.metric("Tenure", f"{row['tenure']}d", tl)
-                p8.metric("ARPU/mo", f"Rp {row['arpu']:,}", al)
+                p7.metric("Tenure", f"{row['tenure']}d", tseg(row["tenure"]))
+                p8.metric("ARPU/mo", f"Rp {row['arpu']:,}", aseg(row["arpu"]))
                 p9.metric("Last Top-up", row["last_active"])
                 p10.metric("Complaints", f"{row['complaints']} open")
 
                 p11,p12,p13,p14 = st.columns(4)
-                p11.metric("Loyalty", f"{LOYALTY_ICON[row['loyalty']]} {LOYALTY[row['loyalty']]}")
-                p12.metric("Interest", f"{INTEREST_ICON[row['interest']]} {INTEREST[row['interest']]}")
+                p11.metric("Loyalty", LOYALTY[row['loyalty']])
+                p12.metric("Interest", INTEREST[row['interest']])
                 p13.metric("Data Drop", f"{row['data_drop']:.0f}%")
                 p14.metric("Network Score", f"{row['network']}/5")
                 st.markdown("---")
 
-                st.markdown("### 🤖 AI Churn Prediction")
+                st.markdown('<div class="section-header">AI Churn Prediction</div>', unsafe_allow_html=True)
                 pa, pb = st.columns([1,2])
                 with pa:
-                    st.metric("Churn Probability", f"{prob*100:.1f}%", risk_text)
+                    st.metric("Churn Probability", f"{prob*100:.1f}%", rlabel)
                 with pb:
                     drivers = get_drivers(row)
                     st.markdown("**Top Risk Drivers:**")
-                    for i,d in enumerate(drivers): st.markdown(f"**{i+1}.** {d}")
+                    for i,d in enumerate(drivers): st.markdown(f"{i+1}. {d}")
                 st.markdown("---")
 
-                st.markdown("### 🎯 Marketer Action Plan")
+                st.markdown('<div class="section-header">Marketer Action Plan</div>', unsafe_allow_html=True)
                 actions = marketer_actions(prob, row["plan_type"], row["interest"], row["loyalty"])
                 for a in actions: st.markdown(f"- {a}")
                 st.markdown("---")
@@ -576,8 +697,8 @@ with tab1:
                 subject, email_body = generate_email_content(row, prob, offer, benefit)
                 wa_msg = generate_whatsapp(row, prob, offer, benefit)
 
-                st.markdown("### 📣 Personalized Messages")
-                mt1, mt2 = st.tabs(["📧 Email", "💬 WhatsApp"])
+                st.markdown('<div class="section-header">Personalized Messages</div>', unsafe_allow_html=True)
+                mt1, mt2 = st.tabs(["Email", "WhatsApp"])
 
                 with mt1:
                     st.markdown(f"**To:** `{row['email']}`")
@@ -589,27 +710,27 @@ with tab1:
                     st.text_area("WhatsApp Message", wa_msg, height=220, key=f"wa_{row['id']}")
 
                 st.markdown("---")
-                st.markdown("### 📤 Send to Customer")
+                st.markdown('<div class="section-header">Send to Customer</div>', unsafe_allow_html=True)
                 now = datetime.now().strftime("%H:%M:%S")
                 b1,b2,b3 = st.columns(3)
 
-                if b1.button(f"📧 Send Email", key=f"se_{row['id']}"):
+                if b1.button("Send Email", key=f"se_{row['id']}"):
                     if not gmail_app_pass:
                         st.error("Please enter your Gmail App Password in the sidebar.")
                     else:
                         ok, msg = send_email(row["email"], subject, email_body, sender_email, gmail_app_pass)
-                        if ok: st.success(f"✅ Email sent to {row['email']} at {now}")
-                        else:  st.error(f"❌ Failed: {msg}")
+                        if ok: st.success(f"Email sent to {row['email']} at {now}")
+                        else:  st.error(f"Failed: {msg}")
 
-                if b2.button(f"💬 Send WhatsApp", key=f"sw_{row['id']}"):
+                if b2.button("Send WhatsApp", key=f"sw_{row['id']}"):
                     if not twilio_sid or not twilio_token or not twilio_wa_from:
                         st.error("Please enter Twilio credentials in the sidebar.")
                     else:
                         ok, msg = send_whatsapp(row["whatsapp"], wa_msg, twilio_sid, twilio_token, twilio_wa_from)
-                        if ok: st.success(f"✅ WhatsApp sent to {row['whatsapp']} at {now}")
-                        else:  st.error(f"❌ Failed: {msg}")
+                        if ok: st.success(f"WhatsApp sent to {row['whatsapp']} at {now}")
+                        else:  st.error(f"Failed: {msg}")
 
-                if b3.button(f"📤 Send Both", key=f"sb_{row['id']}"):
+                if b3.button("Send Both", key=f"sb_{row['id']}"):
                     errors = []
                     if not gmail_app_pass:
                         errors.append("Gmail App Password missing")
@@ -622,19 +743,20 @@ with tab1:
                         ok, msg = send_whatsapp(row["whatsapp"], wa_msg, twilio_sid, twilio_token, twilio_wa_from)
                         if not ok: errors.append(f"WhatsApp: {msg}")
                     if errors:
-                        for e in errors: st.error(f"❌ {e}")
+                        for e in errors: st.error(f"Failed: {e}")
                     else:
-                        st.success(f"✅ Email + WhatsApp sent to {row['name']} at {now}")
+                        st.success(f"Email + WhatsApp sent to {row['name']} at {now}")
 
+# ── Tab 2: All Customers ─────────────────────────────────────────────────────
 with tab2:
-    st.subheader("📋 All Customers Overview")
+    st.markdown('<div class="section-header">All Customers Overview</div>', unsafe_allow_html=True)
     Xi2 = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     all_probs = model.predict_proba(Xi2)[:,1]
     disp = df.copy()
     disp["Churn Risk"]  = (all_probs*100).round(1).astype(str)+"%"
-    disp["Risk Level"]  = ["🔴 HIGH" if p>=0.70 else "🟠 MED" if p>=0.40 else "🟢 LOW" for p in all_probs]
-    disp["Loyalty"]     = disp["loyalty"].apply(lambda x: f"{LOYALTY_ICON[x]} {LOYALTY[x]}")
-    disp["Interest"]    = disp["interest"].apply(lambda x: f"{INTEREST_ICON[x]} {INTEREST[x]}")
+    disp["Risk Level"]  = ["HIGH" if p>=0.70 else "MED" if p>=0.40 else "LOW" for p in all_probs]
+    disp["Loyalty"]     = disp["loyalty"].apply(lambda x: LOYALTY[x])
+    disp["Interest"]    = disp["interest"].apply(lambda x: INTEREST[x])
     disp["ARPU"]        = disp["arpu"].apply(lambda x: f"Rp {x:,}")
     show = disp[["id","name","email","whatsapp","plan_type","city","tenure","ARPU","Loyalty","Interest","Churn Risk","Risk Level"]].rename(
         columns={"id":"ID","name":"Name","email":"Email","whatsapp":"WhatsApp",
@@ -644,24 +766,24 @@ with tab2:
     total=len(df); high=sum(all_probs>=0.70); med=sum((all_probs>=0.40)&(all_probs<0.70)); low=sum(all_probs<0.40); post=len(df[df["plan_type"]=="Postpaid"])
     m1,m2,m3,m4,m5 = st.columns(5)
     m1.metric("Total Customers", total)
-    m2.metric("🔴 High Risk", high, f"{high/total*100:.0f}%")
-    m3.metric("🟠 Medium Risk", med, f"{med/total*100:.0f}%")
-    m4.metric("🟢 Low Risk", low, f"{low/total*100:.0f}%")
-    m5.metric("🏢 Postpaid", post, f"{post/total*100:.0f}% of total")
+    m2.metric("High Risk", high, f"{high/total*100:.0f}%")
+    m3.metric("Medium Risk", med, f"{med/total*100:.0f}%")
+    m4.metric("Low Risk", low, f"{low/total*100:.0f}%")
+    m5.metric("Postpaid", post, f"{post/total*100:.0f}% of total")
 
 # ── Tab 3: Model Evaluation ──────────────────────────────────────────────────
 with tab3:
-    st.subheader("Prototype Model Evaluation")
+    st.markdown('<div class="section-header">Prototype Model Evaluation</div>', unsafe_allow_html=True)
     st.markdown("Evaluation on held-out test set using stratified split. Model: `GradientBoostingClassifier(n_estimators=100, max_depth=4)`.")
 
-    st.markdown("#### Dataset Split")
+    st.markdown('<div class="section-header">Dataset Split</div>', unsafe_allow_html=True)
     sp1, sp2, sp3 = st.columns(3)
     sp1.metric("Train", f"{eval_metrics['n_train']} samples")
     sp2.metric("Validation", f"{eval_metrics['n_val']} samples")
     sp3.metric("Test", f"{eval_metrics['n_test']} samples")
 
     st.markdown("---")
-    st.markdown("#### Performance Metrics")
+    st.markdown('<div class="section-header">Performance Metrics</div>', unsafe_allow_html=True)
     e1, e2, e3, e4, e5 = st.columns(5)
     e1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
     e2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
@@ -670,7 +792,7 @@ with tab3:
     e5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
 
     st.markdown("---")
-    st.markdown("#### Latency")
+    st.markdown('<div class="section-header">Latency</div>', unsafe_allow_html=True)
     l1, l2, l3 = st.columns(3)
     l1.metric("Training Time", f"{eval_metrics['train_time']:.2f}s")
     l2.metric(f"Inference (batch {eval_metrics['n_test']})", f"{eval_metrics['infer_time_ms']:.1f} ms")
@@ -678,7 +800,7 @@ with tab3:
 
     st.markdown("---")
     cm = eval_metrics["cm"]
-    st.markdown("#### Confusion Matrix")
+    st.markdown('<div class="section-header">Confusion Matrix</div>', unsafe_allow_html=True)
     cm_df = pd.DataFrame(
         [[cm[0,0], cm[0,1]], [cm[1,0], cm[1,1]]],
         index=["Actual: Retain", "Actual: Churn"],
@@ -687,38 +809,46 @@ with tab3:
     st.dataframe(cm_df, use_container_width=False)
 
     st.markdown("---")
-    st.markdown("#### Feature Importance Ranking")
+    st.markdown('<div class="section-header">Feature Importance Ranking</div>', unsafe_allow_html=True)
     feat_eval = pd.DataFrame({
         "Feature": eval_metrics["features"],
         "Importance": eval_metrics["importances"]
     }).sort_values("Importance", ascending=False).set_index("Feature")
-    st.bar_chart(feat_eval)
+    st.bar_chart(feat_eval, color="#EB1C24")
 
     st.markdown("---")
-    st.markdown("#### Go / No-Go Evaluation")
-    gng = pd.DataFrame([
-        {"Metric": "AUC-ROC", "Target": ">= 0.80", "Actual": f"{eval_metrics['auc']:.4f}",
-         "Status": "PASS" if eval_metrics['auc']>=0.80 else "FAIL"},
-        {"Metric": "Recall (churn)", "Target": ">= 0.75", "Actual": f"{eval_metrics['recall']:.4f}",
-         "Status": "PASS" if eval_metrics['recall']>=0.75 else "FAIL"},
-        {"Metric": "Precision (churn)", "Target": ">= 0.60", "Actual": f"{eval_metrics['precision']:.4f}",
-         "Status": "PASS" if eval_metrics['precision']>=0.60 else "FAIL"},
-        {"Metric": "F1-score", "Target": ">= 0.67", "Actual": f"{eval_metrics['f1']:.4f}",
-         "Status": "PASS" if eval_metrics['f1']>=0.67 else "FAIL"},
-        {"Metric": "Latency / sample", "Target": "< 5s", "Actual": f"{eval_metrics['infer_per_sample_ms']:.3f} ms",
-         "Status": "PASS"},
-    ])
-    st.dataframe(gng, use_container_width=True, hide_index=True)
+    st.markdown('<div class="section-header">Go / No-Go Evaluation</div>', unsafe_allow_html=True)
 
-    all_pass = (eval_metrics['auc']>=0.80 and eval_metrics['recall']>=0.75
-                and eval_metrics['precision']>=0.60 and eval_metrics['f1']>=0.67)
+    def _status_html(passed):
+        return '<span class="pass-badge">PASS</span>' if passed else '<span class="fail-badge">FAIL</span>'
+
+    gng_data = [
+        ("AUC-ROC", ">= 0.80", f"{eval_metrics['auc']:.4f}", eval_metrics['auc']>=0.80),
+        ("Recall (churn)", ">= 0.75", f"{eval_metrics['recall']:.4f}", eval_metrics['recall']>=0.75),
+        ("Precision (churn)", ">= 0.60", f"{eval_metrics['precision']:.4f}", eval_metrics['precision']>=0.60),
+        ("F1-score", ">= 0.67", f"{eval_metrics['f1']:.4f}", eval_metrics['f1']>=0.67),
+        ("Latency / sample", "< 5s", f"{eval_metrics['infer_per_sample_ms']:.3f} ms", True),
+    ]
+    gng_html = """<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+    <tr style="border-bottom:2px solid #EB1C24; text-align:left;">
+        <th style="padding:8px;">Metric</th><th style="padding:8px;">Target</th>
+        <th style="padding:8px;">Actual</th><th style="padding:8px;">Status</th></tr>"""
+    for metric, target, actual, passed in gng_data:
+        gng_html += f"""<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:8px;">{metric}</td><td style="padding:8px;">{target}</td>
+        <td style="padding:8px; font-weight:700;">{actual}</td><td style="padding:8px;">{_status_html(passed)}</td></tr>"""
+    gng_html += "</table>"
+    st.markdown(gng_html, unsafe_allow_html=True)
+
+    all_pass = all(p for _,_,_,p in gng_data)
+    st.markdown("")
     if all_pass:
         st.success("**RECOMMENDATION: GO** — All pre-pilot thresholds passed by significant margins.")
     else:
         st.warning("**RECOMMENDATION: NEEDS REVIEW** — Some thresholds not met.")
 
     st.markdown("---")
-    st.markdown("#### Risk Distribution (Test Set)")
+    st.markdown('<div class="section-header">Risk Distribution (Test Set)</div>', unsafe_allow_html=True)
     y_prob = eval_metrics["y_prob"]
     n_te = len(y_prob)
     hi = int((y_prob >= 0.70).sum())
@@ -731,9 +861,9 @@ with tab3:
 
 # ── Tab 4: AI Architecture ───────────────────────────────────────────────────
 with tab4:
-    st.subheader("AI Solution Architecture")
+    st.markdown('<div class="section-header">AI Solution Architecture</div>', unsafe_allow_html=True)
 
-    st.markdown("#### Problem Statement")
+    st.markdown('<div class="section-header">Problem Statement</div>', unsafe_allow_html=True)
     st.markdown(
         "Indosat Ooredoo Hutchison (IOH) serves ~95 million subscribers in Indonesia. "
         "Churn pressure comes from SIM consolidation and competitive pricing. "
@@ -743,10 +873,10 @@ with tab4:
     )
 
     st.markdown("---")
-    st.markdown("#### Hybrid AI Architecture")
+    st.markdown('<div class="section-header">Hybrid AI Architecture</div>', unsafe_allow_html=True)
     col_pred, col_gen = st.columns(2)
     with col_pred:
-        st.markdown("##### Predictive AI (Churn Scoring)")
+        st.markdown("**Predictive AI (Churn Scoring)**")
         st.markdown(
             "- **Model:** GradientBoostingClassifier (scikit-learn)\n"
             "- **Config:** 100 trees, max depth 4\n"
@@ -756,7 +886,7 @@ with tab4:
             "- **Why:** Gradient boosted trees are industry-standard for tabular churn prediction"
         )
     with col_gen:
-        st.markdown("##### Generative AI (Message Personalization)")
+        st.markdown("**Generative AI (Message Personalization)**")
         st.markdown(
             "- **Model:** Anthropic Claude Sonnet 4.5 via API\n"
             "- **Task:** Generate personalized Bahasa Indonesia retention messages\n"
@@ -766,33 +896,34 @@ with tab4:
         )
 
     st.markdown("---")
-    st.markdown("#### Data Pipeline")
-    st.code("""
-Raw Data (CDR, CRM, Billing, CS Tickets, Network Logs)
+    st.markdown('<div class="section-header">Data Pipeline</div>', unsafe_allow_html=True)
+    st.code("""Raw Data (CDR, CRM, Billing, CS Tickets, Network Logs)
    -> Daily ingestion + NLP preprocessing (IndoBERT for Bahasa Indonesia sentiment)
    -> Feature engineering (7d/14d/30d rolling windows) + 4-dimension segmentation
    -> Predictive model: daily batch scoring -> churn probability per subscriber
    -> Generative model: personalized retention message per flagged subscriber
    -> Delivery (Email via Gmail SMTP, WhatsApp via Twilio API)
-   -> Feedback loop: outcomes (delivered / opened / retained / churned) feed monthly retraining
-    """, language=None)
+   -> Feedback loop: outcomes (delivered / opened / retained / churned) feed monthly retraining""", language=None)
 
     st.markdown("---")
-    st.markdown("#### Technology Stack")
-    stack = pd.DataFrame([
-        {"Component": "Predictive Model", "Technology": "scikit-learn GradientBoostingClassifier (prod: XGBoost/LightGBM)"},
-        {"Component": "Generative Model", "Technology": "Anthropic Claude Sonnet 4.5 (anthropic Python SDK)"},
-        {"Component": "UI / Dashboard", "Technology": "Streamlit (deployed on Streamlit Community Cloud)"},
-        {"Component": "Email Delivery", "Technology": "Gmail SMTP (smtplib)"},
-        {"Component": "WhatsApp Delivery", "Technology": "Twilio WhatsApp API"},
-        {"Component": "Language", "Technology": "Python 3.11 (pandas, numpy, scikit-learn, anthropic, twilio)"},
-        {"Component": "Deployment", "Technology": "GitHub -> Streamlit Cloud auto-deploy on push"},
-        {"Component": "Secrets Management", "Technology": "Streamlit Cloud Secrets Manager (dev); AWS Secrets Manager (prod)"},
-    ])
-    st.dataframe(stack, use_container_width=True, hide_index=True)
+    st.markdown('<div class="section-header">Technology Stack</div>', unsafe_allow_html=True)
+
+    stack_html = """<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+    <tr style="border-bottom:2px solid #EB1C24; text-align:left;">
+        <th style="padding:8px; width:25%;">Component</th><th style="padding:8px;">Technology</th></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Predictive Model</td><td style="padding:8px;">scikit-learn GradientBoostingClassifier (prod: XGBoost / LightGBM)</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Generative Model</td><td style="padding:8px;">Anthropic Claude Sonnet 4.5 (anthropic Python SDK)</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">UI / Dashboard</td><td style="padding:8px;">Streamlit (deployed on Streamlit Community Cloud)</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Email Delivery</td><td style="padding:8px;">Gmail SMTP (smtplib)</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">WhatsApp Delivery</td><td style="padding:8px;">Twilio WhatsApp API</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Language</td><td style="padding:8px;">Python 3.11 (pandas, numpy, scikit-learn, anthropic, twilio)</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Deployment</td><td style="padding:8px;">GitHub -> Streamlit Cloud auto-deploy on push</td></tr>
+    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Secrets</td><td style="padding:8px;">Streamlit Cloud Secrets Manager (dev); AWS Secrets Manager (prod)</td></tr>
+    </table>"""
+    st.markdown(stack_html, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("#### Next Steps for Production")
+    st.markdown('<div class="section-header">Next Steps for Production</div>', unsafe_allow_html=True)
     st.markdown(
         "1. **Data quality sprint** — unify legacy Ooredoo + Hutchison subscriber IDs\n"
         "2. **Recalibration** — retrain on real post-merger data (expect AUC 0.80-0.85 range)\n"
