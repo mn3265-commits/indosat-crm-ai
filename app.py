@@ -705,6 +705,8 @@ tab0, tab1, tab2, tab5, tab3, tab4 = st.tabs([
 
 # ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
 with tab0:
+    st.caption("Overview of all subscribers in the database, their risk distribution, and model performance at a glance.")
+    st.markdown("")
     Xi_all = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     probs_all = apply_overrides(df["id"].values, model.predict_proba(Xi_all)[:,1])
     n_total = len(df)
@@ -727,6 +729,7 @@ with tab0:
 
     with col_left:
         st.markdown("**Risk Distribution**")
+        st.caption("Number of subscribers in each churn risk tier.")
         risk_df = pd.DataFrame({
             "Risk Level": ["High (>=70%)", "Medium (40-70%)", "Low (<40%)"],
             "Subscribers": [n_high, n_med, n_low]
@@ -735,6 +738,7 @@ with tab0:
 
     with col_right:
         st.markdown("**Feature Importance**")
+        st.caption("Which subscriber attributes contribute most to the churn prediction.")
         feat_df = pd.DataFrame({
             "Feature": eval_metrics["features"],
             "Weight": eval_metrics["importances"]
@@ -743,7 +747,8 @@ with tab0:
 
     st.markdown("")
     st.markdown("")
-    st.markdown("**Model Performance** (held-out test set, n=450)")
+    st.markdown("**Model Performance**")
+    st.caption("GradientBoostingClassifier evaluated on a held-out test set of 450 subscribers.")
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
     k2.metric("Precision", f"{eval_metrics['precision']:.4f}")
@@ -761,6 +766,7 @@ with tab0:
 
 # ── Tab 1: Search & Predict ──────────────────────────────────────────────────
 with tab1:
+    st.caption("Search for a subscriber to view their profile, AI churn prediction, and send personalized retention messages.")
     st.markdown("")
     c1, c2, c3 = st.columns([2,1,1])
     with c1:
@@ -859,6 +865,7 @@ with tab1:
 
                 # ── SECTION 1: Customer Profile ───────────────────────
                 subsection("Customer Profile")
+                st.caption("Subscriber demographics, plan details, and usage indicators.")
                 p1, p2, p3 = st.columns(3)
                 p1.metric("ID", row["id"])
                 p2.metric("Plan", row["plan"])
@@ -874,6 +881,7 @@ with tab1:
 
                 # ── SECTION 2: Churn & Risk Drivers ───────────────────
                 subsection("Churn & Risk Drivers")
+                st.caption("AI-generated churn probability and the top factors driving this subscriber's risk level.")
                 pred_col, driver_col = st.columns([1, 2], gap="large")
                 with pred_col:
                     st.metric("Churn Probability", f"{effective_prob*100:.1f}%", rlabel)
@@ -886,6 +894,7 @@ with tab1:
 
                 # ── SECTION 3: Actions ────────────────────────────────
                 subsection("Actions")
+                st.caption("Review the AI prediction and decide: approve, escalate to high risk, or mark as safe. This is the human-in-the-loop decision point.")
                 def do_approve(rid):
                     st.session_state[f"reviewed_{rid}"] = True
                 def do_escalate(rid):
@@ -916,6 +925,7 @@ with tab1:
 
                 # ── SECTION 4: Messages ───────────────────────────────
                 subsection("Messages")
+                st.caption("Personalized retention messages generated for this subscriber. Send via email or automated voice call.")
                 subject, email_body = generate_email_content(row, effective_prob, offer, benefit)
                 call_msg = generate_call_script(row, effective_prob, offer, benefit)
                 msg_source = "Template"
@@ -983,7 +993,7 @@ with tab1:
 
                 # ── SECTION 5: Outcome ────────────────────────────────
                 subsection("Outcome")
-                st.caption("Record the result after contacting this customer. This data feeds into monthly model retraining.")
+                st.caption("Record the result after contacting this subscriber. Outcome data feeds back into the monthly model retraining pipeline to improve future predictions.")
                 fb1, fb2 = st.columns(2)
                 with fb1:
                     fb_outcome = st.selectbox("Outcome",
@@ -1012,6 +1022,7 @@ with tab1:
 
 # ── Tab 2: All Customers ─────────────────────────────────────────────────────
 with tab2:
+    st.caption("Full subscriber database with churn risk scores. Export reports and run batch retention campaigns.")
     st.markdown("")
     Xi2 = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     all_probs = apply_overrides(df["id"].values, model.predict_proba(Xi2)[:,1])
@@ -1037,6 +1048,7 @@ with tab2:
     # ── CSV Download ──────────────────────────────────────────────────────
     st.markdown("")
     st.markdown("**Export Risk Report**")
+    st.caption("Download a CSV file with all subscriber data and churn predictions for use by the retention team.")
     export_df = df.copy()
     export_df["churn_probability"] = (all_probs * 100).round(1)
     export_df["risk_level"] = ["HIGH" if p>=0.70 else "MEDIUM" if p>=0.40 else "LOW" for p in all_probs]
@@ -1055,6 +1067,7 @@ with tab2:
     # ── Batch Email ───────────────────────────────────────────────────────
     st.markdown("")
     st.markdown("**Batch Actions**")
+    st.caption("Send personalized retention emails to all high-risk subscribers in one click.")
     high_risk_df = df[all_probs >= 0.70].copy()
     high_risk_df["prob"] = all_probs[all_probs >= 0.70]
 
@@ -1084,8 +1097,7 @@ with tab2:
 
 # ── Tab 5: What-If Simulator ─────────────────────────────────────────────────
 with tab5:
-    st.markdown("")
-    st.markdown(
+    st.caption(
         "Adjust subscriber features and see how the churn prediction changes in real time. "
         "This demonstrates model interpretability: which factors drive churn risk up or down."
     )
@@ -1156,8 +1168,7 @@ with tab5:
 
 # ── Tab 3: Model Evaluation ──────────────────────────────────────────────────
 with tab3:
-    st.markdown("")
-    st.markdown("Evaluation on held-out test set (stratified split). Model: GradientBoostingClassifier, 100 trees, max depth 4.")
+    st.caption("Comprehensive evaluation of the prototype model, including baseline comparison, business impact estimation, and stress-test scenarios.")
 
     st.markdown("")
     e1, e2, e3, e4 = st.columns(4)
@@ -1171,6 +1182,7 @@ with tab3:
 
     with ev_left:
         st.markdown("**Confusion Matrix**")
+        st.caption("True vs predicted classifications on the test set.")
         cm = eval_metrics["cm"]
         cm_df = pd.DataFrame(
             [[cm[0,0], cm[0,1]], [cm[1,0], cm[1,1]]],
@@ -1181,12 +1193,14 @@ with tab3:
 
         st.markdown("")
         st.markdown("**Latency**")
+        st.caption("Training and inference speed benchmarks.")
         l1, l2 = st.columns(2)
         l1.metric("Training Time", f"{eval_metrics['train_time']:.2f}s")
         l2.metric("Per-sample", f"{eval_metrics['infer_per_sample_ms']:.3f} ms")
 
     with ev_right:
         st.markdown("**Feature Importance**")
+        st.caption("Relative contribution of each feature to the model's predictions.")
         feat_eval = pd.DataFrame({
             "Feature": eval_metrics["features"],
             "Importance": eval_metrics["importances"]
@@ -1197,6 +1211,7 @@ with tab3:
     st.markdown("")
     st.markdown("")
     st.markdown("**Go / No-Go Evaluation**")
+    st.caption("Pre-defined thresholds that must be met before proceeding to pilot deployment.")
 
     gng = pd.DataFrame([
         {"Metric": "AUC-ROC", "Target": ">= 0.80", "Actual": f"{eval_metrics['auc']:.4f}",
@@ -1223,9 +1238,9 @@ with tab3:
     st.markdown("")
     st.markdown("")
     st.markdown("**Baseline Comparison**")
-    st.markdown(
-        "Three models evaluated on the same test set. Rule-based heuristic uses simple threshold rules "
-        "(tenure < 100, data drop > 50%, complaints >= 2). Logistic Regression is a standard linear baseline."
+    st.caption(
+        "Three models evaluated on the same test set: GradientBoosting (primary), Logistic Regression (linear baseline), "
+        "and a rule-based heuristic with no machine learning (tenure < 100, data drop > 50%, complaints >= 2)."
     )
     baselines = eval_metrics["baselines"]
     bl_rows = []
@@ -1252,11 +1267,10 @@ with tab3:
     st.markdown("")
     st.markdown("")
     st.markdown("**Business Impact Estimation**")
-    st.markdown(
-        "Projections based on Indonesian telecom industry benchmarks: "
+    st.caption(
+        "Revenue impact projections based on Indonesian telecom benchmarks: "
         "monthly churn rate 3-5% (GSMA Intelligence, 2023), "
-        "CAC Rp 150,000-300,000, "
-        "ARPU Rp 40,000/month (Indosat FY2024 annual report), "
+        "CAC Rp 150,000-300,000, ARPU Rp 40,000/month (Indosat FY2024), "
         "average customer lifetime 24 months."
     )
 
@@ -1297,9 +1311,9 @@ with tab3:
     st.markdown("")
     st.markdown("")
     st.markdown("**Edge Cases and Known Failure Modes**")
-    st.markdown(
+    st.caption(
         "Four stress scenarios drawn from real Indonesian telecom operations. Each perturbs the test data "
-        "to simulate a market event the model was not trained for."
+        "to simulate a market event the model was not trained for. These highlight why human oversight and regular retraining are essential."
     )
 
     for scenario, data in eval_metrics["edge_cases"].items():
@@ -1318,7 +1332,9 @@ with tab3:
 
 # ── Tab 4: AI Architecture ───────────────────────────────────────────────────
 with tab4:
+    st.caption("System design overview: problem context, hybrid AI architecture, data pipeline, and technology stack.")
     st.markdown("")
+    st.markdown("**Problem Statement**")
     st.markdown(
         "Indosat Ooredoo Hutchison (IOH) serves ~95 million subscribers in Indonesia. "
         "Churn pressure comes from SIM consolidation and competitive pricing. "
