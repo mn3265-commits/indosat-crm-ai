@@ -96,6 +96,7 @@ def send_whatsapp(to_number, message, sid, token, from_number):
 def generate_customers():
     random.seed(42); np.random.seed(42)
     customers = [
+        {"name":"Agung Nugroho",  "email":"mn3265@columbia.edu",       "whatsapp":"+16469890162", "plan_type":"Postpaid"},
         {"name":"Budi Santoso",   "email":"budi.santoso@gmail.com",    "whatsapp":"+6281234560001","plan_type":"Postpaid"},
         {"name":"Siti Rahayu",    "email":"siti.rahayu@yahoo.com",     "whatsapp":"+6281234560002","plan_type":"Prepaid"},
         {"name":"Ahmad Fauzi",    "email":"ahmad.fauzi@gmail.com",     "whatsapp":"+6281234560003","plan_type":"Postpaid"},
