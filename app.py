@@ -777,10 +777,50 @@ with tab1:
                     </div>
                 </div>""", unsafe_allow_html=True)
 
+                # ── Human Override ─────────────────────────────────────
+                st.markdown("")
+                override_key = f"override_{row['id']}"
+                with st.expander("Human-in-the-loop: Override risk level"):
+                    st.markdown(
+                        "Marketers can override the AI prediction based on context the model cannot see "
+                        "(e.g., recent branch visit, known personal circumstances, ongoing negotiation)."
+                    )
+                    ov1, ov2 = st.columns([2, 1])
+                    with ov1:
+                        override_options = ["Use AI prediction", "Override to HIGH RISK", "Override to MEDIUM", "Override to LOW RISK"]
+                        current_override = st.session_state.get(override_key, "Use AI prediction")
+                        override_choice = st.selectbox(
+                            "Risk level", override_options,
+                            index=override_options.index(current_override),
+                            key=f"ov_sel_{row['id']}")
+                    with ov2:
+                        override_reason = st.text_input(
+                            "Reason for override",
+                            placeholder="e.g., Customer visited branch yesterday",
+                            key=f"ov_reason_{row['id']}")
+
+                    if override_choice != "Use AI prediction":
+                        if st.button("Apply override", key=f"ov_apply_{row['id']}"):
+                            st.session_state[override_key] = override_choice
+                            st.session_state[f"ov_reason_saved_{row['id']}"] = override_reason
+                            st.rerun()
+
+                    if current_override != "Use AI prediction":
+                        saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "N/A")
+                        st.info(f"Active override: **{current_override}**. Reason: {saved_reason}")
+
+                # Apply override to effective probability for actions/messages
+                effective_prob = prob
+                if st.session_state.get(override_key, "Use AI prediction") != "Use AI prediction":
+                    override_val = st.session_state[override_key]
+                    if "HIGH" in override_val: effective_prob = 0.85
+                    elif "MEDIUM" in override_val: effective_prob = 0.55
+                    else: effective_prob = 0.20
+
                 # ── Actions ───────────────────────────────────────────
                 st.markdown("")
                 with st.expander("Recommended actions"):
-                    actions = marketer_actions(prob, row["plan_type"], row["interest"], row["loyalty"])
+                    actions = marketer_actions(effective_prob, row["plan_type"], row["interest"], row["loyalty"])
                     for a in actions:
                         st.markdown(f"- {a}")
 
@@ -859,6 +899,49 @@ with tab1:
                         for e in errors: st.error(e)
                     else:
                         st.success(f"Both sent to {row['name']}")
+
+                # ── Feedback Loop ─────────────────────────────────────
+                st.markdown("")
+                fb_key = f"feedback_{row['id']}"
+                with st.expander("Human-in-the-loop: Outcome feedback"):
+                    st.markdown(
+                        "After contacting the customer, record the outcome. "
+                        "This data feeds back into monthly model retraining to improve future predictions."
+                    )
+                    fb1, fb2, fb3 = st.columns([1, 1, 2])
+                    with fb1:
+                        fb_outcome = st.selectbox(
+                            "Outcome",
+                            ["Pending", "Retained (offer accepted)", "Retained (other reason)",
+                             "Churned despite outreach", "Could not reach"],
+                            key=f"fb_out_{row['id']}")
+                    with fb2:
+                        fb_channel = st.selectbox(
+                            "Channel used",
+                            ["Not contacted yet", "Email", "WhatsApp", "Phone call", "Branch visit"],
+                            key=f"fb_ch_{row['id']}")
+                    with fb3:
+                        fb_notes = st.text_input(
+                            "Notes",
+                            placeholder="e.g., Customer asked for family plan instead",
+                            key=f"fb_notes_{row['id']}")
+
+                    if st.button("Save feedback", key=f"fb_save_{row['id']}"):
+                        st.session_state[fb_key] = {
+                            "outcome": fb_outcome,
+                            "channel": fb_channel,
+                            "notes": fb_notes,
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "model_prediction": f"{prob*100:.1f}%",
+                            "override": st.session_state.get(override_key, "None"),
+                        }
+                        st.success("Feedback saved. This will be used for model retraining.")
+
+                    if fb_key in st.session_state:
+                        fb = st.session_state[fb_key]
+                        st.caption(
+                            f"Last feedback: {fb['outcome']} via {fb['channel']} "
+                            f"(recorded {fb['timestamp']})")
 
 # ── Tab 2: All Customers ─────────────────────────────────────────────────────
 with tab2:
