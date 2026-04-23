@@ -612,7 +612,7 @@ def generate_call_script(row, prob, offer, benefit):
                 f"Tukarkan poin Anda di aplikasi my IM3, menu Poin dan Reward. "
                 f"Terima kasih, {first}. Kami senang Anda bersama kami.")
 
-# ── Indosat Dark Theme ────────────────────────────────────────────────────────
+# ── Indosat Styling ───────────────────────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -621,52 +621,61 @@ html, body, [class*="css"] {font-family: 'Inter', sans-serif !important;}
 
 /* Metric cards */
 [data-testid="stMetric"] {
-    background: #1A1D24;
-    padding: 16px;
+    background: #F7F7F8;
+    padding: 14px 16px;
     border-radius: 10px;
-    border: 1px solid #2A2D35;
 }
 [data-testid="stMetricLabel"] {
-    font-size: 0.7rem; color: #888;
+    font-size: 0.7rem; color: #999;
     text-transform: uppercase; letter-spacing: 0.5px;
     font-weight: 600;
 }
-[data-testid="stMetricValue"] {font-size: 1.3rem; font-weight: 700; color: #F0F0F0;}
+[data-testid="stMetricValue"] {font-size: 1.3rem; font-weight: 700;}
 
 /* Expander */
 div[data-testid="stExpander"] {
-    border: 1px solid #2A2D35;
+    border: 1px solid #eaeaea;
     border-radius: 10px;
     margin-bottom: 8px;
 }
 
 /* Tabs */
-.stTabs [data-baseweb="tab-list"] {gap: 0; border-bottom: 2px solid #2A2D35;}
+.stTabs [data-baseweb="tab-list"] {gap: 0; border-bottom: 2px solid #eee;}
 .stTabs [data-baseweb="tab"] {font-weight: 600; font-size: 0.85rem;}
 
 /* Buttons */
 .stButton > button {border-radius: 8px; font-weight: 600; font-size: 0.8rem;}
 
+/* Subsection headers */
+.subsection {
+    font-size: 0.7rem; font-weight: 700; color: #EB1C24;
+    text-transform: uppercase; letter-spacing: 1px;
+    padding-bottom: 6px; margin-top: 20px; margin-bottom: 10px;
+    border-bottom: 2px solid #EB1C24;
+}
+
 /* Risk boxes */
 .risk-box {padding: 20px; border-radius: 10px; margin: 8px 0;}
-.risk-box-high {background: rgba(198,40,40,0.15); border-left: 4px solid #EF5350;}
-.risk-box-med {background: rgba(230,81,0,0.12); border-left: 4px solid #FFA726;}
-.risk-box-low {background: rgba(46,125,50,0.12); border-left: 4px solid #66BB6A;}
+.risk-box-high {background: #FEF2F2; border-left: 4px solid #DC2626;}
+.risk-box-med {background: #FFFBEB; border-left: 4px solid #F59E0B;}
+.risk-box-low {background: #F0FDF4; border-left: 4px solid #16A34A;}
 
 /* Hide branding */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-header {visibility: hidden;}
 </style>""", unsafe_allow_html=True)
+
+def subsection(title):
+    st.markdown(f'<div class="subsection">{title}</div>', unsafe_allow_html=True)
 
 def risk_badge_html(prob):
     base = "display:inline-block; padding:4px 14px; border-radius:20px; font-weight:700; font-size:0.75rem; letter-spacing:0.5px;"
     if prob >= 0.70:
-        return f'<span style="{base} background:#EF5350; color:white;">HIGH RISK</span>'
+        return f'<span style="{base} background:#FDEDED; color:#C62828; border:1px solid #EF9A9A;">HIGH RISK</span>'
     elif prob >= 0.40:
-        return f'<span style="{base} background:#FFA726; color:#1a1a1a;">MEDIUM RISK</span>'
+        return f'<span style="{base} background:#FFF8E1; color:#E65100; border:1px solid #FFE082;">MEDIUM RISK</span>'
     else:
-        return f'<span style="{base} background:#66BB6A; color:#1a1a1a;">LOW RISK</span>'
+        return f'<span style="{base} background:#E8F5E9; color:#2E7D32; border:1px solid #A5D6A7;">LOW RISK</span>'
 
 def risk_box_class(prob):
     if prob >= 0.70: return "risk-box risk-box-high"
@@ -685,9 +694,9 @@ def apply_overrides(ids, probs):
     return result
 
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
-st.markdown("""<div style="margin-bottom:28px;">
-    <div style="font-size:2rem; font-weight:700; color:#EB1C24; letter-spacing:-0.5px;">Indosat CRM AI</div>
-    <div style="font-size:0.85rem; color:#666; margin-top:4px; letter-spacing:0.5px;">CUSTOMER INTELLIGENCE &nbsp;&bull;&nbsp; CHURN PREDICTION &nbsp;&bull;&nbsp; PERSONALIZED RETENTION</div>
+st.markdown("""<div style="margin-bottom:24px;">
+    <div style="font-size:1.8rem; font-weight:700; color:#EB1C24; letter-spacing:-0.5px;">Indosat CRM AI</div>
+    <div style="font-size:0.75rem; color:#999; margin-top:4px; letter-spacing:1px; text-transform:uppercase;">Customer Intelligence &nbsp;&bull;&nbsp; Churn Prediction &nbsp;&bull;&nbsp; Personalized Retention</div>
 </div>""", unsafe_allow_html=True)
 
 tab0, tab1, tab2, tab5, tab3, tab4 = st.tabs([
@@ -730,7 +739,7 @@ with tab0:
             "Feature": eval_metrics["features"],
             "Weight": eval_metrics["importances"]
         }).sort_values("Weight", ascending=False).set_index("Feature")
-        st.bar_chart(feat_df, color="#FFA726")
+        st.bar_chart(feat_df, color="#555555")
 
     st.markdown("")
     st.markdown("")
@@ -823,48 +832,48 @@ with tab1:
 
                 # ── Step tracker ──────────────────────────────────────
                 def step_style(active, done):
-                    if done: return "background:#66BB6A; color:#1a1a1a; border:none;"
+                    if done: return "background:#2E7D32; color:white; border:none;"
                     elif active: return "background:#EB1C24; color:white; border:none;"
-                    else: return "background:transparent; color:#555; border:1px solid #333;"
+                    else: return "background:#F7F7F8; color:#aaa; border:1px solid #e0e0e0;"
 
                 s1_done = True
                 s2_done = is_reviewed
                 s3_done = is_sent
                 s4_done = has_feedback
 
-                st.markdown(f"""<div style="display:flex; gap:4px; margin:4px 0 20px 0;">
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(True, s1_done)}">1. AI SCORED</div>
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s1_done and not s2_done, s2_done)}">2. REVIEWED</div>
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s2_done and not s3_done, s3_done)}">3. CONTACTED</div>
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s3_done and not s4_done, s4_done)}">4. OUTCOME</div>
+                # ── Workflow tracker ───────────────────────────────────
+                st.markdown(f"""<div style="display:flex; gap:4px; margin:4px 0 16px 0;">
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:6px; font-size:0.7rem; font-weight:600; {step_style(True, s1_done)}">1. AI SCORED</div>
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:6px; font-size:0.7rem; font-weight:600; {step_style(s1_done and not s2_done, s2_done)}">2. REVIEWED</div>
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:6px; font-size:0.7rem; font-weight:600; {step_style(s2_done and not s3_done, s3_done)}">3. CONTACTED</div>
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:6px; font-size:0.7rem; font-weight:600; {step_style(s3_done and not s4_done, s4_done)}">4. OUTCOME</div>
                 </div>""", unsafe_allow_html=True)
 
-                # ── Profile + Prediction ──────────────────────────────
                 drivers = get_drivers(row)
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
                 effective_prob = display_prob
-
                 if is_overridden:
                     saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
                     override_driver = f"Marketer override: {saved_reason}" if saved_reason else "Marketer override (no reason given)"
                     drivers = [override_driver] + drivers
 
+                # ── SECTION 1: Customer Profile ───────────────────────
+                subsection("Customer Profile")
                 p1, p2, p3 = st.columns(3)
                 p1.metric("ID", row["id"])
                 p2.metric("Plan", row["plan"])
                 p3.metric("City", row["city"])
-
                 p4, p5, p6 = st.columns(3)
                 p4.metric("Tenure", f"{row['tenure']}d", tseg(row["tenure"]))
                 p5.metric("ARPU", f"Rp {row['arpu']:,}", aseg(row["arpu"]))
                 p6.metric("Loyalty", LOYALTY[row['loyalty']])
-
                 p7, p8, p9 = st.columns(3)
                 p7.metric("Data Drop", f"{row['data_drop']:.0f}%")
                 p8.metric("Complaints", f"{row['complaints']} open")
                 p9.metric("Network", f"{row['network']}/5")
 
-                st.markdown("")
+                # ── SECTION 2: Churn & Risk Drivers ───────────────────
+                subsection("Churn & Risk Drivers")
                 pred_col, driver_col = st.columns([1, 2], gap="large")
                 with pred_col:
                     st.metric("Churn Probability", f"{effective_prob*100:.1f}%", rlabel)
@@ -872,12 +881,11 @@ with tab1:
                         saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
                         st.caption(f"Override: {saved_reason}. AI was {prob*100:.1f}%.")
                 with driver_col:
-                    st.markdown("**Risk Drivers**")
                     for i, d in enumerate(drivers):
                         st.markdown(f"{i+1}. {d}")
 
-                # ── Step 2: Marketer Decision ─────────────────────────
-                st.markdown("")
+                # ── SECTION 3: Actions ────────────────────────────────
+                subsection("Actions")
                 d1, d2, d3, d4 = st.columns(4)
                 d1.button("Approve AI", key=f"approve_{row['id']}", on_click=lambda rid=row['id']: (
                     st.session_state.update({f"reviewed_{rid}": True})))
@@ -898,14 +906,13 @@ with tab1:
                         f"override_{rid}", f"reviewed_{rid}", f"sent_{rid}",
                         f"feedback_{rid}", f"ov_reason_saved_{rid}", f"ai_msg_{rid}"]])
 
-                # ── Recommended actions (collapsed) ───────────────────
-                with st.expander("Recommended actions"):
+                with st.expander("View recommended actions"):
                     actions = marketer_actions(effective_prob, row["plan_type"], row["interest"], row["loyalty"])
                     for a in actions:
                         st.markdown(f"- {a}")
 
-                # ── Step 3: Messages & Send ───────────────────────────
-                st.markdown("")
+                # ── SECTION 4: Messages ───────────────────────────────
+                subsection("Messages")
                 subject, email_body = generate_email_content(row, effective_prob, offer, benefit)
                 call_msg = generate_call_script(row, effective_prob, offer, benefit)
                 msg_source = "Template"
@@ -916,7 +923,7 @@ with tab1:
                     call_msg = st.session_state[ai_key].get("call", st.session_state[ai_key].get("sms", call_msg))
                     msg_source = "Claude AI"
 
-                st.markdown(f"**Retention Messages** (`{msg_source}`)")
+                st.caption(f"Source: {msg_source}")
                 if anthropic_key and ANTHROPIC_AVAILABLE:
                     if st.button("Generate with Claude AI", key=f"ai_{row['id']}"):
                         with st.spinner("Generating..."):
@@ -931,10 +938,10 @@ with tab1:
                 with email_col:
                     st.markdown(f"**Email** to `{row['email']}`")
                     st.caption(f"Subject: {subject}")
-                    st.text_area("Email body", email_body, height=240, key=f"email_{row['id']}", label_visibility="collapsed")
+                    st.text_area("Email body", email_body, height=220, key=f"email_{row['id']}", label_visibility="collapsed")
                 with call_col:
                     st.markdown(f"**Voice Call** to `{row['whatsapp']}`")
-                    st.text_area("Call script", call_msg, height=240, key=f"call_{row['id']}", label_visibility="collapsed")
+                    st.text_area("Call script", call_msg, height=220, key=f"call_{row['id']}", label_visibility="collapsed")
 
                 se1, se2, se3, _ = st.columns([1, 1, 1, 1])
                 if se1.button("Send Email", key=f"se_{row['id']}"):
@@ -971,9 +978,9 @@ with tab1:
                         st.session_state[sent_key] = True
                         st.success(f"Email + call to {row['name']}")
 
-                # ── Step 4: Outcome ───────────────────────────────────
-                st.markdown("")
-                st.markdown("**Record Outcome** (feeds into retraining)")
+                # ── SECTION 5: Outcome ────────────────────────────────
+                subsection("Outcome")
+                st.caption("Record the result after contacting this customer. This data feeds into monthly model retraining.")
                 fb1, fb2 = st.columns(2)
                 with fb1:
                     fb_outcome = st.selectbox("Outcome",
