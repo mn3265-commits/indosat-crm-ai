@@ -795,33 +795,19 @@ with tab1:
                     elif active: return "background:#EB1C24; color:white;"
                     else: return "background:#e0e0e0; color:#999;"
 
-                s1_done = True  # AI always scores
+                s1_done = True
                 s2_done = is_reviewed
                 s3_done = is_sent
                 s4_done = has_feedback
 
-                st.markdown(f"""<div style="display:flex; gap:4px; margin:8px 0 16px 0;">
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.75rem; font-weight:600; {step_style(True, s1_done)}">1. AI SCORED</div>
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.75rem; font-weight:600; {step_style(s1_done and not s2_done, s2_done)}">2. REVIEWED</div>
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.75rem; font-weight:600; {step_style(s2_done and not s3_done, s3_done)}">3. CONTACTED</div>
-                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.75rem; font-weight:600; {step_style(s3_done and not s4_done, s4_done)}">4. OUTCOME</div>
+                st.markdown(f"""<div style="display:flex; gap:4px; margin:4px 0 20px 0;">
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(True, s1_done)}">1. AI SCORED</div>
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s1_done and not s2_done, s2_done)}">2. REVIEWED</div>
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s2_done and not s3_done, s3_done)}">3. CONTACTED</div>
+                    <div style="flex:1; text-align:center; padding:8px; border-radius:4px; font-size:0.7rem; font-weight:600; {step_style(s3_done and not s4_done, s4_done)}">4. OUTCOME</div>
                 </div>""", unsafe_allow_html=True)
 
-                # ── Profile metrics ───────────────────────────────────
-                p1,p2,p3,p4 = st.columns(4)
-                p1.metric("ID", row["id"])
-                p2.metric("Plan", row["plan"])
-                p3.metric("City", row["city"])
-                p4.metric("Tenure", f"{row['tenure']}d", tseg(row["tenure"]))
-
-                p5,p6,p7,p8 = st.columns(4)
-                p5.metric("ARPU/mo", f"Rp {row['arpu']:,}", aseg(row["arpu"]))
-                p6.metric("Loyalty", LOYALTY[row['loyalty']])
-                p7.metric("Data Drop", f"{row['data_drop']:.0f}%")
-                p8.metric("Complaints", f"{row['complaints']} open")
-
-                # ── Prediction box ────────────────────────────────────
-                st.markdown("")
+                # ── Combined profile + prediction card ────────────────
                 drivers = get_drivers(row)
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
                 effective_prob = display_prob
@@ -831,112 +817,112 @@ with tab1:
                     override_driver = f"Marketer override: {saved_reason}" if saved_reason else "Marketer override (no reason given)"
                     drivers = [override_driver] + drivers
 
-                box_cls = risk_box_class(effective_prob)
                 badge = risk_badge_html(effective_prob)
                 override_note = ""
                 if is_overridden:
                     saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
                     reason_text = f" ({saved_reason})" if saved_reason else ""
-                    override_note = (
-                        f'<div style="margin-top:8px; font-size:0.8rem; color:#555;">'
-                        f'Overridden by marketer{reason_text}. AI prediction was {prob*100:.1f}%.</div>')
+                    override_note = f'<div style="font-size:0.75rem; color:#888; margin-top:4px;">Override{reason_text}. AI was {prob*100:.1f}%.</div>'
 
-                driver_html = "".join(f"<div style='margin:4px 0;'><strong>{i+1}.</strong> {d}</div>" for i, d in enumerate(drivers))
+                driver_html = "".join(f"<div style='margin:3px 0; font-size:0.85rem;'><strong>{i+1}.</strong> {d}</div>" for i, d in enumerate(drivers))
+
+                # Single unified card: profile left, prediction right
+                box_cls = risk_box_class(effective_prob)
+                profile_items = f"""
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 24px; font-size:0.85rem;">
+                        <div><span style="color:#888;">ID:</span> {row['id']}</div>
+                        <div><span style="color:#888;">Plan:</span> {row['plan']}</div>
+                        <div><span style="color:#888;">City:</span> {row['city']}</div>
+                        <div><span style="color:#888;">Tenure:</span> {row['tenure']}d ({tseg(row['tenure'])})</div>
+                        <div><span style="color:#888;">ARPU:</span> Rp {row['arpu']:,}/mo</div>
+                        <div><span style="color:#888;">Loyalty:</span> {LOYALTY[row['loyalty']]}</div>
+                        <div><span style="color:#888;">Data Drop:</span> {row['data_drop']:.0f}%</div>
+                        <div><span style="color:#888;">Complaints:</span> {row['complaints']} open</div>
+                        <div><span style="color:#888;">Email:</span> {row['email']}</div>
+                        <div><span style="color:#888;">Phone:</span> {row['whatsapp']}</div>
+                    </div>"""
+
                 st.markdown(f"""<div class="{box_cls}">
-                    <div style="display:flex; align-items:flex-start; gap:32px; flex-wrap:wrap;">
-                        <div style="min-width:160px;">
-                            <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Churn Probability</div>
-                            <div style="font-size:2rem; font-weight:700; margin-bottom:8px;">{effective_prob*100:.1f}%</div>
-                            {badge}{override_note}
+                    <div style="display:flex; gap:32px; flex-wrap:wrap;">
+                        <div style="flex:1; min-width:280px;">
+                            <div style="color:#888; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; font-weight:600;">Customer Profile</div>
+                            {profile_items}
                         </div>
-                        <div style="flex:1; min-width:250px;">
-                            <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Risk Drivers</div>
+                        <div style="min-width:200px; border-left:1px solid rgba(0,0,0,0.1); padding-left:24px;">
+                            <div style="color:#888; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; font-weight:600;">Churn Risk</div>
+                            <div style="font-size:2.2rem; font-weight:700; line-height:1;">{effective_prob*100:.1f}%</div>
+                            <div style="margin:8px 0;">{badge}</div>
+                            {override_note}
+                            <div style="margin-top:12px; color:#888; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.5px; font-weight:600;">Risk Drivers</div>
                             {driver_html}
                         </div>
                     </div>
                 </div>""", unsafe_allow_html=True)
 
-                # ── Decision buttons (Step 2: Review) ─────────────────
+                # ── Step 2: Marketer Decision ─────────────────────────
                 st.markdown("")
-                st.markdown("**Marketer Decision**")
                 d1, d2, d3, d4 = st.columns(4)
+                d1.button("Approve AI", key=f"approve_{row['id']}", on_click=lambda rid=row['id']: (
+                    st.session_state.update({f"reviewed_{rid}": True})))
+                d2.button("Escalate", key=f"escalate_{row['id']}", on_click=lambda rid=row['id']: (
+                    st.session_state.update({
+                        f"override_{rid}": "Override to HIGH RISK",
+                        f"ov_reason_saved_{rid}": "Escalated by marketer",
+                        f"reviewed_{rid}": True}),
+                    st.session_state.pop(f"ai_msg_{rid}", None)))
+                d3.button("Mark Safe", key=f"safe_{row['id']}", on_click=lambda rid=row['id']: (
+                    st.session_state.update({
+                        f"override_{rid}": "Override to LOW RISK",
+                        f"ov_reason_saved_{rid}": "Marked safe by marketer",
+                        f"reviewed_{rid}": True}),
+                    st.session_state.pop(f"ai_msg_{rid}", None)))
+                d4.button("Reset", key=f"reset_{row['id']}", on_click=lambda rid=row['id']: [
+                    st.session_state.pop(k, None) for k in [
+                        f"override_{rid}", f"reviewed_{rid}", f"sent_{rid}",
+                        f"feedback_{rid}", f"ov_reason_saved_{rid}", f"ai_msg_{rid}"]])
 
-                if d1.button("Approve AI", key=f"approve_{row['id']}"):
-                    st.session_state[review_key] = True
-                    st.rerun()
-
-                if d2.button("Escalate", key=f"escalate_{row['id']}"):
-                    st.session_state[override_key] = "Override to HIGH RISK"
-                    st.session_state[f"ov_reason_saved_{row['id']}"] = "Escalated by marketer"
-                    st.session_state[review_key] = True
-                    ai_key_clear = f"ai_msg_{row['id']}"
-                    if ai_key_clear in st.session_state:
-                        del st.session_state[ai_key_clear]
-                    st.rerun()
-
-                if d3.button("Mark Safe", key=f"safe_{row['id']}"):
-                    st.session_state[override_key] = "Override to LOW RISK"
-                    st.session_state[f"ov_reason_saved_{row['id']}"] = "Marked safe by marketer"
-                    st.session_state[review_key] = True
-                    ai_key_clear = f"ai_msg_{row['id']}"
-                    if ai_key_clear in st.session_state:
-                        del st.session_state[ai_key_clear]
-                    st.rerun()
-
-                if d4.button("Reset", key=f"reset_{row['id']}"):
-                    for k in [override_key, review_key, sent_key, fb_key,
-                              f"ov_reason_saved_{row['id']}", f"ai_msg_{row['id']}"]:
-                        if k in st.session_state:
-                            del st.session_state[k]
-                    st.rerun()
-
-                # ── Recommended actions ───────────────────────────────
+                # ── Recommended actions (collapsed) ───────────────────
                 with st.expander("Recommended actions"):
                     actions = marketer_actions(effective_prob, row["plan_type"], row["interest"], row["loyalty"])
                     for a in actions:
                         st.markdown(f"- {a}")
 
-                # ── Messages (Step 3: Contact) ────────────────────────
+                # ── Step 3: Messages & Send ───────────────────────────
                 st.markdown("")
                 subject, email_body = generate_email_content(row, effective_prob, offer, benefit)
                 call_msg = generate_call_script(row, effective_prob, offer, benefit)
-                msg_source = "Rule-based template"
+                msg_source = "Template"
                 ai_key = f"ai_msg_{row['id']}"
                 if ai_key in st.session_state:
                     subject = st.session_state[ai_key]["subject"]
                     email_body = st.session_state[ai_key]["email"]
                     call_msg = st.session_state[ai_key].get("call", st.session_state[ai_key].get("sms", call_msg))
-                    msg_source = "Generated by Claude AI"
+                    msg_source = "Claude AI"
 
-                msg_head1, msg_head2 = st.columns([2, 1])
-                with msg_head1:
-                    st.markdown("**Personalized Messages**")
-                    st.caption(f"Source: {msg_source}")
-                with msg_head2:
+                msg_h1, msg_h2 = st.columns([3, 1])
+                with msg_h1:
+                    st.markdown(f"**Retention Messages** &nbsp; `{msg_source}`")
+                with msg_h2:
                     if anthropic_key and ANTHROPIC_AVAILABLE:
-                        if st.button("Generate with Claude AI", key=f"ai_{row['id']}"):
-                            with st.spinner("Claude is writing..."):
+                        if st.button("Generate with AI", key=f"ai_{row['id']}"):
+                            with st.spinner("Generating..."):
                                 result = generate_with_claude(row, effective_prob, drivers, offer, benefit, anthropic_key)
                             if result:
                                 st.session_state[ai_key] = {"subject": result[0], "email": result[1], "call": result[2]}
                                 st.rerun()
                             else:
-                                st.error("Claude generation failed. Using template.")
+                                st.error("Generation failed.")
 
-                email_col, call_col = st.columns(2, gap="large")
+                email_col, call_col = st.columns(2, gap="medium")
                 with email_col:
-                    st.caption(f"Email to {row['email']}")
-                    st.caption(f"Subject: {subject}")
-                    st.text_area("Email", email_body, height=280, key=f"email_{row['id']}", label_visibility="collapsed")
+                    st.caption(f"Email  /  {row['email']}  /  {subject}")
+                    st.text_area("E", email_body, height=240, key=f"email_{row['id']}", label_visibility="collapsed")
                 with call_col:
-                    st.caption(f"Voice call to {row['whatsapp']}")
-                    st.text_area("Call script", call_msg, height=280, key=f"call_{row['id']}", label_visibility="collapsed")
+                    st.caption(f"Voice Call  /  {row['whatsapp']}")
+                    st.text_area("C", call_msg, height=240, key=f"call_{row['id']}", label_visibility="collapsed")
 
-                st.markdown("")
-                now = datetime.now().strftime("%H:%M:%S")
-                s1, s2, s3, _ = st.columns([1, 1, 1, 1])
-
-                if s1.button("Send Email", key=f"se_{row['id']}"):
+                se1, se2, se3, _ = st.columns([1, 1, 1, 1])
+                if se1.button("Send Email", key=f"se_{row['id']}"):
                     if not gmail_app_pass:
                         st.error("Gmail App Password missing.")
                     else:
@@ -944,9 +930,8 @@ with tab1:
                         if ok:
                             st.session_state[sent_key] = True
                             st.success(f"Email sent to {row['email']}")
-                        else:  st.error(f"Failed: {msg}")
-
-                if s2.button("Call Customer", key=f"sw_{row['id']}"):
+                        else: st.error(f"Failed: {msg}")
+                if se2.button("Call Customer", key=f"sw_{row['id']}"):
                     if not twilio_sid or not twilio_token or not twilio_from:
                         st.error("Twilio credentials missing.")
                     else:
@@ -954,61 +939,51 @@ with tab1:
                         if ok:
                             st.session_state[sent_key] = True
                             st.success(f"Calling {row['whatsapp']}...")
-                        else:  st.error(f"Failed: {msg}")
-
-                if s3.button("Email + Call", key=f"sb_{row['id']}"):
+                        else: st.error(f"Failed: {msg}")
+                if se3.button("Email + Call", key=f"sb_{row['id']}"):
                     errors = []
                     if gmail_app_pass:
                         ok, msg = send_email(row["email"], subject, email_body, sender_email, gmail_app_pass)
                         if not ok: errors.append(f"Email: {msg}")
-                    else: errors.append("Gmail credentials missing")
+                    else: errors.append("Gmail missing")
                     if twilio_sid and twilio_token and twilio_from:
                         ok, msg = send_call(row["whatsapp"], call_msg, twilio_sid, twilio_token, twilio_from)
                         if not ok: errors.append(f"Call: {msg}")
-                    else: errors.append("Twilio credentials missing")
+                    else: errors.append("Twilio missing")
                     if errors:
                         for e in errors: st.error(e)
                     else:
                         st.session_state[sent_key] = True
-                        st.success(f"Email sent + calling {row['name']}...")
+                        st.success(f"Email + call to {row['name']}")
 
-                # ── Outcome feedback (Step 4) ─────────────────────────
+                # ── Step 4: Outcome ───────────────────────────────────
                 st.markdown("")
-                st.markdown("**Record Outcome**")
-                fb1, fb2, fb3 = st.columns([1, 1, 2])
+                st.markdown("**Record Outcome** (feeds into retraining)")
+                fb1, fb2 = st.columns(2)
                 with fb1:
-                    fb_outcome = st.selectbox(
-                        "Outcome",
+                    fb_outcome = st.selectbox("Outcome",
                         ["Pending", "Retained (offer accepted)", "Retained (other reason)",
                          "Churned despite outreach", "Could not reach"],
                         key=f"fb_out_{row['id']}")
                 with fb2:
-                    fb_channel = st.selectbox(
-                        "Channel used",
+                    fb_channel = st.selectbox("Channel",
                         ["Not contacted yet", "Email", "Voice call", "Phone call (manual)", "Branch visit"],
                         key=f"fb_ch_{row['id']}")
-                with fb3:
-                    fb_notes = st.text_input(
-                        "Notes",
-                        placeholder="e.g., Customer asked for family plan instead",
-                        key=f"fb_notes_{row['id']}")
+                fb_notes = st.text_input("Notes", placeholder="e.g., Customer asked for family plan instead",
+                    key=f"fb_notes_{row['id']}")
 
                 if st.button("Save outcome", key=f"fb_save_{row['id']}"):
                     st.session_state[fb_key] = {
-                        "outcome": fb_outcome,
-                        "channel": fb_channel,
-                        "notes": fb_notes,
+                        "outcome": fb_outcome, "channel": fb_channel, "notes": fb_notes,
                         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                         "model_prediction": f"{prob*100:.1f}%",
                         "override": st.session_state.get(override_key, "None"),
                     }
-                    st.success("Outcome saved. This data feeds back into model retraining.")
                     st.rerun()
 
                 if has_feedback:
                     fb = st.session_state[fb_key]
-                    st.caption(
-                        f"Recorded: {fb['outcome']} via {fb['channel']} ({fb['timestamp']})")
+                    st.success(f"Outcome: {fb['outcome']} via {fb['channel']} ({fb['timestamp']})")
 
 # ── Tab 2: All Customers ─────────────────────────────────────────────────────
 with tab2:
