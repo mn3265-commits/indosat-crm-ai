@@ -849,26 +849,29 @@ with tab1:
                     override_driver = f"Marketer override: {saved_reason}" if saved_reason else "Marketer override (no reason given)"
                     drivers = [override_driver] + drivers
 
-                profile_col, risk_col = st.columns([3, 2], gap="large")
+                p1, p2, p3 = st.columns(3)
+                p1.metric("ID", row["id"])
+                p2.metric("Plan", row["plan"])
+                p3.metric("City", row["city"])
 
-                with profile_col:
-                    st.markdown(f"""| | |
-|:--|:--|
-| **ID** | {row['id']} |
-| **Plan** | {row['plan']} ({row['plan_type']}) |
-| **City** | {row['city']} |
-| **Tenure** | {row['tenure']}d ({tseg(row['tenure'])}) |
-| **ARPU** | Rp {row['arpu']:,}/mo ({aseg(row['arpu'])}) |
-| **Loyalty** | {LOYALTY[row['loyalty']]} |
-| **Data Drop** | {row['data_drop']:.0f}% |
-| **Complaints** | {row['complaints']} open |
-| **Network** | {row['network']}/5 |""")
+                p4, p5, p6 = st.columns(3)
+                p4.metric("Tenure", f"{row['tenure']}d", tseg(row["tenure"]))
+                p5.metric("ARPU", f"Rp {row['arpu']:,}", aseg(row["arpu"]))
+                p6.metric("Loyalty", LOYALTY[row['loyalty']])
 
-                with risk_col:
+                p7, p8, p9 = st.columns(3)
+                p7.metric("Data Drop", f"{row['data_drop']:.0f}%")
+                p8.metric("Complaints", f"{row['complaints']} open")
+                p9.metric("Network", f"{row['network']}/5")
+
+                st.markdown("")
+                pred_col, driver_col = st.columns([1, 2], gap="large")
+                with pred_col:
                     st.metric("Churn Probability", f"{effective_prob*100:.1f}%", rlabel)
                     if is_overridden:
                         saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
                         st.caption(f"Override: {saved_reason}. AI was {prob*100:.1f}%.")
+                with driver_col:
                     st.markdown("**Risk Drivers**")
                     for i, d in enumerate(drivers):
                         st.markdown(f"{i+1}. {d}")
