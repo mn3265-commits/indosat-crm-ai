@@ -71,7 +71,7 @@ with st.sidebar:
     gmail_app_pass = st.text_input("Gmail App Password", value=_GMAIL_APP_PASS, type="password", placeholder="Leave blank if using Secrets")
 
     st.markdown("---")
-    st.markdown("**Twilio SMS**")
+    st.markdown("**Twilio Voice Call**")
     twilio_sid     = st.text_input("Twilio Account SID", value=_TWILIO_SID, type="password")
     twilio_token   = st.text_input("Twilio Auth Token", value=_TWILIO_TOKEN, type="password")
     twilio_from    = st.text_input("Twilio Phone Number", value=_TWILIO_FROM, placeholder="+1xxxxxxxxxx")
@@ -94,25 +94,36 @@ def send_email(to_email, subject, body, sender, app_password):
     except Exception as e:
         return False, str(e)
 
-def send_sms(to_number, message, sid, token, from_number):
+def send_call(to_number, message, sid, token, from_number):
     if not TWILIO_AVAILABLE:
         return False, "Twilio library not installed. Run: pip install twilio"
     try:
         client = TwilioClient(sid, token)
-        # Strip whatsapp: prefix if present, ensure + prefix
         to_clean = to_number.replace("whatsapp:", "").strip()
         if not to_clean.startswith("+"):
             to_clean = f"+{to_clean}"
         from_clean = from_number.replace("whatsapp:", "").strip()
-        client.messages.create(body=message, from_=from_clean, to=to_clean)
-        return True, "SMS sent successfully."
+        # Use TwiML to speak the message in Indonesian
+        twiml = (
+            f'<Response>'
+            f'<Say language="id-ID" voice="Polly.Siti">{message}</Say>'
+            f'<Pause length="1"/>'
+            f'<Say language="id-ID" voice="Polly.Siti">Terima kasih telah mendengarkan. Selamat tinggal.</Say>'
+            f'</Response>'
+        )
+        client.calls.create(
+            to=to_clean,
+            from_=from_clean,
+            twiml=twiml
+        )
+        return True, "Call initiated successfully."
     except Exception as e:
         return False, str(e)
 
 # ── Claude AI message generation ──────────────────────────────────────────────
 def generate_with_claude(row, prob, drivers, offer, benefit, api_key):
     """Call Claude API to generate personalized retention messages.
-    Returns (email_subject, email_body, sms_msg) or None on failure."""
+    Returns (email_subject, email_body, call_script) or None on failure."""
     if not ANTHROPIC_AVAILABLE or not api_key:
         return None
 
@@ -126,7 +137,7 @@ def generate_with_claude(row, prob, drivers, offer, benefit, api_key):
 
     prompt = f"""You are a CRM retention copywriter for Indosat Ooredoo Hutchison, Indonesia's major telecom operator.
 
-Write TWO personalized retention messages in Bahasa Indonesia for this subscriber (one email, one SMS):
+Write TWO personalized retention messages in Bahasa Indonesia for this subscriber (one email, one voice call script):
 
 CUSTOMER PROFILE:
 - Name: {row['name']}
@@ -147,8 +158,8 @@ OUTPUT FORMAT (follow exactly):
 [one line subject]
 ===EMAIL_BODY===
 [full email body, professional but warm, address the customer by first name, mention the offer, include call to action via myIM3 app, sign off as the appropriate Indosat team]
-===SMS===
-[short SMS message, max 320 characters, casual but professional tone, include the offer and call to action]
+===CALL===
+[voice call script in natural spoken Bahasa Indonesia, 30-60 seconds when read aloud, warm and professional tone, include the offer, explain how to claim via myIM3 app, close with Indosat Care 185]
 
 RULES:
 - Write entirely in Bahasa Indonesia
@@ -168,11 +179,11 @@ RULES:
         text = response.content[0].text
 
         parts = {}
-        for section in ["EMAIL_SUBJECT", "EMAIL_BODY", "SMS"]:
+        for section in ["EMAIL_SUBJECT", "EMAIL_BODY", "CALL"]:
             marker = f"==={section}==="
             if marker in text:
                 start = text.index(marker) + len(marker)
-                next_markers = [f"==={s}===" for s in ["EMAIL_SUBJECT","EMAIL_BODY","SMS"] if s != section]
+                next_markers = [f"==={s}===" for s in ["EMAIL_SUBJECT","EMAIL_BODY","CALL"] if s != section]
                 end = len(text)
                 for nm in next_markers:
                     if nm in text[start:]:
@@ -181,8 +192,8 @@ RULES:
                             end = candidate
                 parts[section] = text[start:end].strip()
 
-        if all(k in parts for k in ["EMAIL_SUBJECT","EMAIL_BODY","SMS"]):
-            return parts["EMAIL_SUBJECT"], parts["EMAIL_BODY"], parts["SMS"]
+        if all(k in parts for k in ["EMAIL_SUBJECT","EMAIL_BODY","CALL"]):
+            return parts["EMAIL_SUBJECT"], parts["EMAIL_BODY"], parts["CALL"]
         return None
     except Exception:
         return None
@@ -431,7 +442,7 @@ def get_offer(interest, plan_type):
 def marketer_actions(prob, plan_type, interest, loyalty):
     actions = []
     if prob >= 0.70:
-        actions.append("URGENT — Send retention offer within 24 hours via Email + SMS")
+        actions.append("URGENT — Send retention offer within 24 hours via Email + Voice Call")
         actions.append("Schedule personal call from retention team if no response in 48h")
         actions.append("Offer loyalty discount (10-20% off next bill) as last resort")
         if plan_type == "Postpaid":
@@ -554,20 +565,29 @@ Email: care@indosatooredoo.com"""
 
     return subject, body
 
-def generate_sms(row, prob, offer, benefit):
+def generate_call_script(row, prob, offer, benefit):
     first = row["name"].split()[0]
     if prob >= 0.70:
-        return (f"Halo {first}, Indosat punya hadiah khusus untukmu: {offer}. "
-                f"Berlaku 48 jam. Klaim di myIM3 > Penawaran Spesial. "
-                f"Balas YA utk info. Indosat Care 185")
+        return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison. "
+                f"Kami ingin menyampaikan penawaran spesial khusus untuk Anda. "
+                f"Sebagai pelanggan setia selama {row['tenure']} hari, Anda berhak mendapatkan {offer}. "
+                f"Penawaran ini berlaku 48 jam. "
+                f"Untuk klaim, silakan buka aplikasi my IM3, masuk ke menu Penawaran Spesial, "
+                f"dan tap Klaim Sekarang. "
+                f"Jika ada pertanyaan, hubungi kami di 185.")
     elif prob >= 0.40:
-        return (f"Halo {first}, ada penawaran upgrade eksklusif dari Indosat: {offer}. "
-                f"Berlaku 7 hari. Aktifkan di myIM3 > Upgrade Paket. "
-                f"Balas utk info. Indosat Care 185")
+        return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison. "
+                f"Ada penawaran upgrade eksklusif untuk Anda: {offer}. "
+                f"Manfaatnya adalah {benefit}. "
+                f"Penawaran berlaku 7 hari ke depan. "
+                f"Aktifkan di aplikasi my IM3, menu Upgrade Paket. "
+                f"Hubungi kami di 185 untuk informasi lebih lanjut.")
     else:
-        return (f"Halo {first}, terima kasih {row['tenure']} hari bersama Indosat! "
-                f"Hadiah loyalitas: poin reward 2x lipat. "
-                f"Tukar di myIM3 > Poin & Reward. Indosat Care 185")
+        return (f"Halo {first}. Saya dari Indosat Ooredoo Hutchison. "
+                f"Terima kasih telah menjadi pelanggan setia selama {row['tenure']} hari. "
+                f"Sebagai hadiah loyalitas, Anda mendapatkan poin reward 2 kali lipat untuk semua transaksi. "
+                f"Tukarkan poin Anda di aplikasi my IM3, menu Poin dan Reward. "
+                f"Terima kasih, {first}. Kami senang Anda bersama kami.")
 
 # ── Minimal styling (McKinsey-clean) ──────────────────────────────────────────
 st.markdown("""<style>
@@ -661,7 +681,7 @@ with tab0:
     st.markdown(
         "**Predictive AI** scores churn risk per subscriber using GradientBoostingClassifier. "
         "**Generative AI** (Claude Sonnet 4.5) creates personalized Bahasa Indonesia retention messages. "
-        "**Delivery** via Email (Gmail SMTP) and SMS (Twilio API) with rule-based template fallback."
+        "**Delivery** via Email (Gmail SMTP) and Voice Call (Twilio API) with rule-based template fallback."
     )
 
 # ── Tab 1: Search & Predict ──────────────────────────────────────────────────
@@ -805,13 +825,13 @@ with tab1:
 
                 # Prepare messages (uses effective_prob, not raw prob)
                 subject, email_body = generate_email_content(row, effective_prob, offer, benefit)
-                wa_msg = generate_sms(row, effective_prob, offer, benefit)
+                call_msg = generate_call_script(row, effective_prob, offer, benefit)
                 msg_source = "Rule-based template"
                 ai_key = f"ai_msg_{row['id']}"
                 if ai_key in st.session_state:
                     subject = st.session_state[ai_key]["subject"]
                     email_body = st.session_state[ai_key]["email"]
-                    wa_msg = st.session_state[ai_key].get("sms", st.session_state[ai_key].get("whatsapp", wa_msg))
+                    call_msg = st.session_state[ai_key].get("call", st.session_state[ai_key].get("sms", call_msg))
                     msg_source = "Generated by Claude AI"
 
                 # Header row: title + generate button + source
@@ -825,7 +845,7 @@ with tab1:
                             with st.spinner("Claude is writing..."):
                                 result = generate_with_claude(row, effective_prob, drivers, offer, benefit, anthropic_key)
                             if result:
-                                st.session_state[ai_key] = {"subject": result[0], "email": result[1], "sms": result[2]}
+                                st.session_state[ai_key] = {"subject": result[0], "email": result[1], "call": result[2]}
                                 st.rerun()
                             else:
                                 st.error("Claude generation failed. Using template.")
@@ -837,8 +857,8 @@ with tab1:
                     st.caption(f"Subject: {subject}")
                     st.text_area("Email", email_body, height=280, key=f"email_{row['id']}", label_visibility="collapsed")
                 with wa_col:
-                    st.caption(f"SMS to {row['whatsapp']}")
-                    st.text_area("SMS", wa_msg, height=280, key=f"wa_{row['id']}", label_visibility="collapsed")
+                    st.caption(f"Voice call to {row['whatsapp']}")
+                    st.text_area("Call script", call_msg, height=280, key=f"call_{row['id']}", label_visibility="collapsed")
 
                 # ── Send ──────────────────────────────────────────────
                 st.markdown("")
@@ -853,28 +873,28 @@ with tab1:
                         if ok: st.success(f"Email sent to {row['email']}")
                         else:  st.error(f"Failed: {msg}")
 
-                if s2.button("Send SMS", key=f"sw_{row['id']}"):
+                if s2.button("Call Customer", key=f"sw_{row['id']}"):
                     if not twilio_sid or not twilio_token or not twilio_from:
                         st.error("Twilio credentials missing.")
                     else:
-                        ok, msg = send_sms(row["whatsapp"], wa_msg, twilio_sid, twilio_token, twilio_from)
-                        if ok: st.success(f"SMS sent to {row['whatsapp']}")
+                        ok, msg = send_call(row["whatsapp"], call_msg, twilio_sid, twilio_token, twilio_from)
+                        if ok: st.success(f"Calling {row['whatsapp']}...")
                         else:  st.error(f"Failed: {msg}")
 
-                if s3.button("Send Both", key=f"sb_{row['id']}"):
+                if s3.button("Email + Call", key=f"sb_{row['id']}"):
                     errors = []
                     if gmail_app_pass:
                         ok, msg = send_email(row["email"], subject, email_body, sender_email, gmail_app_pass)
                         if not ok: errors.append(f"Email: {msg}")
                     else: errors.append("Gmail credentials missing")
                     if twilio_sid and twilio_token and twilio_from:
-                        ok, msg = send_sms(row["whatsapp"], wa_msg, twilio_sid, twilio_token, twilio_from)
-                        if not ok: errors.append(f"WhatsApp: {msg}")
+                        ok, msg = send_call(row["whatsapp"], call_msg, twilio_sid, twilio_token, twilio_from)
+                        if not ok: errors.append(f"Call: {msg}")
                     else: errors.append("Twilio credentials missing")
                     if errors:
                         for e in errors: st.error(e)
                     else:
-                        st.success(f"Both sent to {row['name']}")
+                        st.success(f"Email sent + calling {row['name']}...")
 
                 # ── Feedback Loop ─────────────────────────────────────
                 st.markdown("")
@@ -894,7 +914,7 @@ with tab1:
                     with fb2:
                         fb_channel = st.selectbox(
                             "Channel used",
-                            ["Not contacted yet", "Email", "SMS", "Phone call", "Branch visit"],
+                            ["Not contacted yet", "Email", "Voice call", "Phone call (manual)", "Branch visit"],
                             key=f"fb_ch_{row['id']}")
                     with fb3:
                         fb_notes = st.text_input(
