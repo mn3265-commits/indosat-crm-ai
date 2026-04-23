@@ -769,6 +769,11 @@ with tab1:
                     elif "MEDIUM" in current_override: effective_prob = 0.55
                     else: effective_prob = 0.20
 
+                    # Prepend override reason as top risk driver
+                    saved_reason = st.session_state.get(f"ov_reason_saved_{row['id']}", "")
+                    override_driver = f"Marketer override: {saved_reason}" if saved_reason else "Marketer override (no reason given)"
+                    drivers = [override_driver] + drivers
+
                 # ── Prediction box (uses effective_prob for color) ─────
                 box_cls = risk_box_class(effective_prob)
                 badge = risk_badge_html(effective_prob)
