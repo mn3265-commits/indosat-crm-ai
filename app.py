@@ -612,66 +612,61 @@ def generate_call_script(row, prob, offer, benefit):
                 f"Tukarkan poin Anda di aplikasi my IM3, menu Poin dan Reward. "
                 f"Terima kasih, {first}. Kami senang Anda bersama kami.")
 
-# ── Indosat Clean Styling ─────────────────────────────────────────────────────
+# ── Indosat Dark Theme ────────────────────────────────────────────────────────
 st.markdown("""<style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* Global font */
 html, body, [class*="css"] {font-family: 'Inter', sans-serif !important;}
-
-/* Tighter container */
 .block-container {padding-top:1.5rem; max-width:1100px;}
 
 /* Metric cards */
 [data-testid="stMetric"] {
-    background: #fafafa;
-    padding: 14px 16px;
-    border-radius: 8px;
-    border: 1px solid #eee;
+    background: #1A1D24;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid #2A2D35;
 }
 [data-testid="stMetricLabel"] {
-    font-size: 0.7rem; color: #999;
+    font-size: 0.7rem; color: #888;
     text-transform: uppercase; letter-spacing: 0.5px;
     font-weight: 600;
 }
-[data-testid="stMetricValue"] {font-size: 1.3rem; font-weight: 700;}
+[data-testid="stMetricValue"] {font-size: 1.3rem; font-weight: 700; color: #F0F0F0;}
 
 /* Expander */
 div[data-testid="stExpander"] {
-    border: 1px solid #e5e5e5;
-    border-radius: 8px;
+    border: 1px solid #2A2D35;
+    border-radius: 10px;
     margin-bottom: 8px;
 }
 
 /* Tabs */
-.stTabs [data-baseweb="tab-list"] {gap: 0; border-bottom: 2px solid #eee;}
+.stTabs [data-baseweb="tab-list"] {gap: 0; border-bottom: 2px solid #2A2D35;}
 .stTabs [data-baseweb="tab"] {font-weight: 600; font-size: 0.85rem;}
 
-/* Tables */
-[data-testid="stDataFrame"] {border-radius: 8px;}
-
 /* Buttons */
-.stButton > button {border-radius: 6px; font-weight: 600; font-size: 0.8rem;}
+.stButton > button {border-radius: 8px; font-weight: 600; font-size: 0.8rem;}
 
-/* Risk boxes for What-If Simulator */
-.risk-box {padding: 20px; border-radius: 8px; margin: 8px 0;}
-.risk-box-high {background: #FDEDED; border-left: 4px solid #C62828;}
-.risk-box-med {background: #FFF8E1; border-left: 4px solid #E65100;}
-.risk-box-low {background: #E8F5E9; border-left: 4px solid #2E7D32;}
+/* Risk boxes */
+.risk-box {padding: 20px; border-radius: 10px; margin: 8px 0;}
+.risk-box-high {background: rgba(198,40,40,0.15); border-left: 4px solid #EF5350;}
+.risk-box-med {background: rgba(230,81,0,0.12); border-left: 4px solid #FFA726;}
+.risk-box-low {background: rgba(46,125,50,0.12); border-left: 4px solid #66BB6A;}
 
-/* Hide Streamlit branding */
+/* Hide branding */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+header {visibility: hidden;}
 </style>""", unsafe_allow_html=True)
 
 def risk_badge_html(prob):
-    base = "display:inline-block; padding:4px 12px; border-radius:4px; font-weight:700; font-size:0.8rem; letter-spacing:0.3px;"
+    base = "display:inline-block; padding:4px 14px; border-radius:20px; font-weight:700; font-size:0.75rem; letter-spacing:0.5px;"
     if prob >= 0.70:
-        return f'<span style="{base} background:#FDEDED; color:#C62828; border:1px solid #EF9A9A;">HIGH RISK</span>'
+        return f'<span style="{base} background:#EF5350; color:white;">HIGH RISK</span>'
     elif prob >= 0.40:
-        return f'<span style="{base} background:#FFF8E1; color:#E65100; border:1px solid #FFE082;">MEDIUM RISK</span>'
+        return f'<span style="{base} background:#FFA726; color:#1a1a1a;">MEDIUM RISK</span>'
     else:
-        return f'<span style="{base} background:#E8F5E9; color:#2E7D32; border:1px solid #A5D6A7;">LOW RISK</span>'
+        return f'<span style="{base} background:#66BB6A; color:#1a1a1a;">LOW RISK</span>'
 
 def risk_box_class(prob):
     if prob >= 0.70: return "risk-box risk-box-high"
@@ -690,9 +685,9 @@ def apply_overrides(ids, probs):
     return result
 
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
-st.markdown("""<div style="margin-bottom:24px;">
-    <div style="font-size:1.8rem; font-weight:700; color:#EB1C24; letter-spacing:-0.5px;">Indosat CRM AI</div>
-    <div style="font-size:0.9rem; color:#888; margin-top:2px;">Customer Intelligence Platform &nbsp;/&nbsp; Churn Prediction &nbsp;/&nbsp; Personalized Retention</div>
+st.markdown("""<div style="margin-bottom:28px;">
+    <div style="font-size:2rem; font-weight:700; color:#EB1C24; letter-spacing:-0.5px;">Indosat CRM AI</div>
+    <div style="font-size:0.85rem; color:#666; margin-top:4px; letter-spacing:0.5px;">CUSTOMER INTELLIGENCE &nbsp;&bull;&nbsp; CHURN PREDICTION &nbsp;&bull;&nbsp; PERSONALIZED RETENTION</div>
 </div>""", unsafe_allow_html=True)
 
 tab0, tab1, tab2, tab5, tab3, tab4 = st.tabs([
@@ -735,7 +730,7 @@ with tab0:
             "Feature": eval_metrics["features"],
             "Weight": eval_metrics["importances"]
         }).sort_values("Weight", ascending=False).set_index("Feature")
-        st.bar_chart(feat_df, color="#555555")
+        st.bar_chart(feat_df, color="#FFA726")
 
     st.markdown("")
     st.markdown("")
@@ -828,9 +823,9 @@ with tab1:
 
                 # ── Step tracker ──────────────────────────────────────
                 def step_style(active, done):
-                    if done: return "background:#2E7D32; color:white; border:none;"
+                    if done: return "background:#66BB6A; color:#1a1a1a; border:none;"
                     elif active: return "background:#EB1C24; color:white; border:none;"
-                    else: return "background:transparent; color:#bbb; border:1px solid #ddd;"
+                    else: return "background:transparent; color:#555; border:1px solid #333;"
 
                 s1_done = True
                 s2_done = is_reviewed
