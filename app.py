@@ -37,7 +37,7 @@ _GMAIL_ADDRESS   = _get_secret("GMAIL_ADDRESS", "agung.technology.management@gma
 _GMAIL_APP_PASS  = _get_secret("GMAIL_APP_PASSWORD", "")
 _TWILIO_SID      = _get_secret("TWILIO_SID", "")
 _TWILIO_TOKEN    = _get_secret("TWILIO_TOKEN", "")
-_TWILIO_FROM     = _get_secret("TWILIO_SMS_FROM", _get_secret("TWILIO_WA_FROM", ""))
+_TWILIO_FROM     = _get_secret("TWILIO_PHONE_FROM", _get_secret("TWILIO_SMS_FROM", _get_secret("TWILIO_WA_FROM", "")))
 _ANTHROPIC_KEY   = _get_secret("ANTHROPIC_API_KEY", "")
 
 with st.sidebar:
