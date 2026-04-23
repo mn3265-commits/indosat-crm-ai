@@ -624,9 +624,9 @@ st.title("Indosat CRM AI")
 st.caption("Customer Intelligence Platform  /  Churn Prediction  /  Personalized Retention")
 st.markdown("")
 
-tab0, tab1, tab2, tab3, tab4 = st.tabs([
+tab0, tab1, tab2, tab5, tab3, tab4 = st.tabs([
     "Dashboard", "Search & Predict", "All Customers",
-    "Model Evaluation", "AI Architecture"])
+    "What-If Simulator", "Model Evaluation", "AI Architecture"])
 
 # ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
 with tab0:
@@ -956,12 +956,132 @@ with tab2:
     st.dataframe(show, use_container_width=True, hide_index=True)
 
     st.markdown("")
-    total=len(df); high=sum(all_probs>=0.70); med=sum((all_probs>=0.40)&(all_probs<0.70)); low=sum(all_probs<0.40); post=len(df[df["plan_type"]=="Postpaid"])
+    total=len(df); high=int(sum(all_probs>=0.70)); med=int(sum((all_probs>=0.40)&(all_probs<0.70))); low=int(sum(all_probs<0.40))
     m1,m2,m3,m4 = st.columns(4)
     m1.metric("Total", total)
     m2.metric("High Risk", high, f"{high/total*100:.0f}%")
     m3.metric("Medium Risk", med, f"{med/total*100:.0f}%")
     m4.metric("Low Risk", low, f"{low/total*100:.0f}%")
+
+    # ── CSV Download ──────────────────────────────────────────────────────
+    st.markdown("")
+    st.markdown("**Export Risk Report**")
+    export_df = df.copy()
+    export_df["churn_probability"] = (all_probs * 100).round(1)
+    export_df["risk_level"] = ["HIGH" if p>=0.70 else "MEDIUM" if p>=0.40 else "LOW" for p in all_probs]
+    export_df["loyalty_tier"] = export_df["loyalty"].apply(lambda x: LOYALTY[x])
+    export_df["interest_segment"] = export_df["interest"].apply(lambda x: INTEREST[x])
+    csv_cols = ["id","name","email","whatsapp","plan_type","city","tenure","arpu",
+                "loyalty_tier","interest_segment","data_drop","topup_days","complaints",
+                "network","churn_probability","risk_level"]
+    csv_data = export_df[csv_cols].to_csv(index=False)
+    st.download_button(
+        "Download full risk report (CSV)",
+        csv_data,
+        file_name=f"indosat_churn_risk_report_{datetime.today().strftime('%Y%m%d')}.csv",
+        mime="text/csv")
+
+    # ── Batch Email ───────────────────────────────────────────────────────
+    st.markdown("")
+    st.markdown("**Batch Actions**")
+    high_risk_df = df[all_probs >= 0.70].copy()
+    high_risk_df["prob"] = all_probs[all_probs >= 0.70]
+
+    if len(high_risk_df) == 0:
+        st.info("No high-risk customers to contact.")
+    else:
+        st.markdown(f"{len(high_risk_df)} high-risk customer(s) eligible for batch outreach.")
+        if st.button(f"Send retention email to all {len(high_risk_df)} high-risk customers"):
+            if not gmail_app_pass:
+                st.error("Gmail App Password missing. Configure in sidebar.")
+            else:
+                sent = 0
+                failed = 0
+                progress = st.progress(0)
+                for i, (_, r) in enumerate(high_risk_df.iterrows()):
+                    offer, benefit = get_offer(r["interest"], r["plan_type"])
+                    subj, body = generate_email_content(r, r["prob"], offer, benefit)
+                    ok, _ = send_email(r["email"], subj, body, sender_email, gmail_app_pass)
+                    if ok: sent += 1
+                    else: failed += 1
+                    progress.progress((i + 1) / len(high_risk_df))
+                progress.empty()
+                if failed == 0:
+                    st.success(f"All {sent} emails sent successfully.")
+                else:
+                    st.warning(f"{sent} sent, {failed} failed.")
+
+# ── Tab 5: What-If Simulator ─────────────────────────────────────────────────
+with tab5:
+    st.markdown("")
+    st.markdown(
+        "Adjust subscriber features and see how the churn prediction changes in real time. "
+        "This demonstrates model interpretability: which factors drive churn risk up or down."
+    )
+
+    st.markdown("")
+    sim1, sim2 = st.columns(2, gap="large")
+
+    with sim1:
+        st.markdown("**Subscriber Profile**")
+        wi_tenure = st.slider("Tenure (days)", 0, 730, 180, key="wi_tenure")
+        wi_arpu = st.slider("ARPU (Rp/month)", 5000, 350000, 75000, step=5000, key="wi_arpu")
+        wi_loyalty = st.selectbox("Loyalty Tier", LOYALTY, index=1, key="wi_loyalty")
+        wi_interest = st.selectbox("Interest Segment", INTEREST, index=0, key="wi_interest")
+
+    with sim2:
+        st.markdown("**Usage & Service**")
+        wi_datadrop = st.slider("Data Usage Drop (%)", 0, 100, 25, key="wi_dd")
+        wi_topup = st.slider("Days Since Last Top-up", 0, 60, 10, key="wi_topup")
+        wi_complaints = st.slider("Open Complaints", 0, 6, 0, key="wi_compl")
+        wi_network = st.slider("Network Quality Score", 1.0, 5.0, 3.5, step=0.1, key="wi_nq")
+
+    wi_X = np.array([[wi_tenure, wi_arpu, LOYALTY.index(wi_loyalty), INTEREST.index(wi_interest),
+                       wi_datadrop, wi_topup, wi_complaints, wi_network]])
+    wi_prob = model.predict_proba(wi_X)[0, 1]
+    wi_label, _ = risk_label(wi_prob)
+
+    st.markdown("")
+    box_cls = risk_box_class(wi_prob)
+    badge = risk_badge_html(wi_prob)
+
+    # Feature contributions (compare to baseline average)
+    baseline_X = np.array([[365, 75000, 1, 0, 25, 10, 0, 3.5]])
+    baseline_prob = model.predict_proba(baseline_X)[0, 1]
+    diff = wi_prob - baseline_prob
+
+    st.markdown(f"""<div class="{box_cls}">
+        <div style="display:flex; align-items:center; gap:32px; flex-wrap:wrap;">
+            <div>
+                <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Predicted Churn Risk</div>
+                <div style="font-size:2.5rem; font-weight:700; margin-bottom:8px;">{wi_prob*100:.1f}%</div>
+                {badge}
+            </div>
+            <div>
+                <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">vs. Average Subscriber</div>
+                <div style="font-size:1.5rem; font-weight:700;">{diff*100:+.1f}pp</div>
+            </div>
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("")
+    st.markdown("**Try these scenarios:**")
+    sc1, sc2, sc3 = st.columns(3)
+    with sc1:
+        st.markdown(
+            "**New price-sensitive user**  \n"
+            "Tenure: 30, ARPU: 15000, Complaints: 2  \n"
+            "Expected: HIGH RISK")
+    with sc2:
+        st.markdown(
+            "**Loyal high-value user**  \n"
+            "Tenure: 600, ARPU: 250000, Gold tier  \n"
+            "Expected: LOW RISK")
+    with sc3:
+        st.markdown(
+            "**Mid-tier with data drop**  \n"
+            "Tenure: 200, Data drop: 70%, Complaints: 1  \n"
+            "Expected: MEDIUM to HIGH")
 
 # ── Tab 3: Model Evaluation ──────────────────────────────────────────────────
 with tab3:
