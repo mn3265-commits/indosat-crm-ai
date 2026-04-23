@@ -14,132 +14,7 @@ try:
 except ImportError:
     TWILIO_AVAILABLE = False
 
-st.set_page_config(page_title="Indosat CRM AI", page_icon="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23EB1C24' width='100' height='100' rx='20'/><text x='50' y='70' font-size='60' text-anchor='middle' fill='white'>I</text></svg>", layout="wide")
-
-# ── Indosat Brand Styling ─────────────────────────────────────────────────────
-st.markdown("""
-<style>
-    /* Header bar */
-    header[data-testid="stHeader"] {
-        background-color: #EB1C24;
-    }
-
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0px;
-        border-bottom: 3px solid #EB1C24;
-    }
-    .stTabs [data-baseweb="tab"] {
-        padding: 10px 24px;
-        font-weight: 600;
-        color: #555;
-    }
-    .stTabs [aria-selected="true"] {
-        color: #EB1C24 !important;
-        border-bottom: 3px solid #EB1C24;
-    }
-
-    /* Metric cards */
-    [data-testid="stMetric"] {
-        background: #f8f9fa;
-        border-left: 4px solid #EB1C24;
-        padding: 12px 16px;
-        border-radius: 4px;
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 0.8rem;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    [data-testid="stMetricValue"] {
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: #1a1a1a;
-    }
-
-    /* Expander */
-    .streamlit-expanderHeader {
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-
-    /* Buttons */
-    .stButton > button {
-        background-color: #EB1C24;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        font-weight: 600;
-    }
-    .stButton > button:hover {
-        background-color: #c4161d;
-        color: white;
-    }
-
-    /* Title area */
-    .brand-header {
-        background: linear-gradient(135deg, #EB1C24 0%, #c4161d 100%);
-        color: white;
-        padding: 24px 32px;
-        border-radius: 8px;
-        margin-bottom: 24px;
-    }
-    .brand-header h1 {
-        color: white;
-        margin: 0;
-        font-size: 1.8rem;
-        font-weight: 700;
-    }
-    .brand-header p {
-        color: rgba(255,255,255,0.85);
-        margin: 4px 0 0 0;
-        font-size: 0.95rem;
-    }
-
-    /* Section headers */
-    .section-header {
-        color: #EB1C24;
-        font-weight: 700;
-        font-size: 1.1rem;
-        border-bottom: 2px solid #EB1C24;
-        padding-bottom: 6px;
-        margin-top: 20px;
-        margin-bottom: 12px;
-    }
-
-    /* Risk badges */
-    .risk-high { color: #dc3545; font-weight: 700; }
-    .risk-med { color: #e67e22; font-weight: 700; }
-    .risk-low { color: #27ae60; font-weight: 700; }
-
-    /* Pass/fail badges */
-    .pass-badge {
-        background: #d4edda; color: #155724;
-        padding: 2px 10px; border-radius: 12px;
-        font-weight: 600; font-size: 0.85rem;
-    }
-    .fail-badge {
-        background: #f8d7da; color: #721c24;
-        padding: 2px 10px; border-radius: 12px;
-        font-weight: 600; font-size: 0.85rem;
-    }
-
-    /* Clean dividers */
-    hr { border: none; border-top: 1px solid #e0e0e0; margin: 20px 0; }
-
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: #1a1a1a;
-    }
-    [data-testid="stSidebar"] * {
-        color: #e0e0e0 !important;
-    }
-    [data-testid="stSidebar"] .stTextInput label {
-        color: #aaa !important;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Indosat CRM AI", layout="wide")
 
 # ── Sidebar Credentials ───────────────────────────────────────────────────────
 import os
@@ -548,12 +423,8 @@ Terima kasih, {first}! Kami senang kamu bersama kami.
 _Indosat Care - 185_"""
 
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
-st.markdown("""
-<div class="brand-header">
-    <h1>Indosat CRM AI</h1>
-    <p>Customer Intelligence Platform — AI-powered churn prediction and personalized retention</p>
-</div>
-""", unsafe_allow_html=True)
+st.title("Indosat CRM AI")
+st.caption("Customer Intelligence Platform — AI-powered churn prediction and personalized retention")
 
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "Dashboard", "Search & Predict", "All Customers",
@@ -561,7 +432,7 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
 
 # ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
 with tab0:
-    st.markdown('<div class="section-header">Executive Summary</div>', unsafe_allow_html=True)
+    st.subheader("Executive Summary")
 
     Xi_all = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     probs_all = model.predict_proba(Xi_all)[:,1]
@@ -583,7 +454,7 @@ with tab0:
     col_left, col_right = st.columns(2)
 
     with col_left:
-        st.markdown('<div class="section-header">Risk Distribution</div>', unsafe_allow_html=True)
+        st.markdown("#### Risk Distribution")
         risk_df = pd.DataFrame({
             "Risk Level": ["High (>=70%)", "Medium (40-70%)", "Low (<40%)"],
             "Count": [n_high, n_med, n_low]
@@ -591,15 +462,15 @@ with tab0:
         st.bar_chart(risk_df, color="#EB1C24")
 
     with col_right:
-        st.markdown('<div class="section-header">Feature Importance</div>', unsafe_allow_html=True)
+        st.markdown("#### Feature Importance")
         feat_df = pd.DataFrame({
             "Feature": eval_metrics["features"],
             "Importance": eval_metrics["importances"]
         }).sort_values("Importance", ascending=False).set_index("Feature")
-        st.bar_chart(feat_df, color="#FEDD00")
+        st.bar_chart(feat_df, color="#EB1C24")
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Model Performance (Test Set)</div>', unsafe_allow_html=True)
+    st.markdown("#### Model Performance (Test Set)")
     k1, k2, k3, k4, k5 = st.columns(5)
     k1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
     k2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
@@ -608,7 +479,7 @@ with tab0:
     k5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Hybrid AI Architecture</div>', unsafe_allow_html=True)
+    st.markdown("#### Hybrid AI Architecture")
     st.info(
         "**Predictive AI** — GradientBoostingClassifier scores churn risk per subscriber.  \n"
         "**Generative AI** — Anthropic Claude Sonnet 4.5 generates personalized Bahasa Indonesia retention messages.  \n"
@@ -617,7 +488,7 @@ with tab0:
 
 # ── Tab 1: Search & Predict ──────────────────────────────────────────────────
 with tab1:
-    st.markdown('<div class="section-header">Search Customer</div>', unsafe_allow_html=True)
+    st.markdown("#### Search Customer")
     c1, c2, c3 = st.columns([2,1,1])
     with c1:
         search = st.text_input("Search by name, email, WhatsApp, or ID", placeholder="e.g. Agung, gmail, IOH-0003...")
@@ -656,7 +527,7 @@ with tab1:
 
             with st.expander(f"{row['name']}  |  {row['email']}  |  {row['plan_type']}  |  {rlabel} ({prob*100:.1f}%)"):
 
-                st.markdown('<div class="section-header">Customer Profile</div>', unsafe_allow_html=True)
+                st.markdown("#### Customer Profile")
                 p1,p2,p3,p4,p5 = st.columns(5)
                 p1.metric("ID", row["id"])
                 p2.metric("Email", row["email"])
@@ -678,7 +549,7 @@ with tab1:
                 p14.metric("Network Score", f"{row['network']}/5")
                 st.markdown("---")
 
-                st.markdown('<div class="section-header">AI Churn Prediction</div>', unsafe_allow_html=True)
+                st.markdown("#### AI Churn Prediction")
                 pa, pb = st.columns([1,2])
                 with pa:
                     st.metric("Churn Probability", f"{prob*100:.1f}%", rlabel)
@@ -688,7 +559,7 @@ with tab1:
                     for i,d in enumerate(drivers): st.markdown(f"{i+1}. {d}")
                 st.markdown("---")
 
-                st.markdown('<div class="section-header">Marketer Action Plan</div>', unsafe_allow_html=True)
+                st.markdown("#### Marketer Action Plan")
                 actions = marketer_actions(prob, row["plan_type"], row["interest"], row["loyalty"])
                 for a in actions: st.markdown(f"- {a}")
                 st.markdown("---")
@@ -697,7 +568,7 @@ with tab1:
                 subject, email_body = generate_email_content(row, prob, offer, benefit)
                 wa_msg = generate_whatsapp(row, prob, offer, benefit)
 
-                st.markdown('<div class="section-header">Personalized Messages</div>', unsafe_allow_html=True)
+                st.markdown("#### Personalized Messages")
                 mt1, mt2 = st.tabs(["Email", "WhatsApp"])
 
                 with mt1:
@@ -710,7 +581,7 @@ with tab1:
                     st.text_area("WhatsApp Message", wa_msg, height=220, key=f"wa_{row['id']}")
 
                 st.markdown("---")
-                st.markdown('<div class="section-header">Send to Customer</div>', unsafe_allow_html=True)
+                st.markdown("#### Send to Customer")
                 now = datetime.now().strftime("%H:%M:%S")
                 b1,b2,b3 = st.columns(3)
 
@@ -749,7 +620,7 @@ with tab1:
 
 # ── Tab 2: All Customers ─────────────────────────────────────────────────────
 with tab2:
-    st.markdown('<div class="section-header">All Customers Overview</div>', unsafe_allow_html=True)
+    st.markdown("#### All Customers Overview")
     Xi2 = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     all_probs = model.predict_proba(Xi2)[:,1]
     disp = df.copy()
@@ -773,17 +644,17 @@ with tab2:
 
 # ── Tab 3: Model Evaluation ──────────────────────────────────────────────────
 with tab3:
-    st.markdown('<div class="section-header">Prototype Model Evaluation</div>', unsafe_allow_html=True)
+    st.markdown("#### Prototype Model Evaluation")
     st.markdown("Evaluation on held-out test set using stratified split. Model: `GradientBoostingClassifier(n_estimators=100, max_depth=4)`.")
 
-    st.markdown('<div class="section-header">Dataset Split</div>', unsafe_allow_html=True)
+    st.markdown("#### Dataset Split")
     sp1, sp2, sp3 = st.columns(3)
     sp1.metric("Train", f"{eval_metrics['n_train']} samples")
     sp2.metric("Validation", f"{eval_metrics['n_val']} samples")
     sp3.metric("Test", f"{eval_metrics['n_test']} samples")
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Performance Metrics</div>', unsafe_allow_html=True)
+    st.markdown("#### Performance Metrics")
     e1, e2, e3, e4, e5 = st.columns(5)
     e1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
     e2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
@@ -792,7 +663,7 @@ with tab3:
     e5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Latency</div>', unsafe_allow_html=True)
+    st.markdown("#### Latency")
     l1, l2, l3 = st.columns(3)
     l1.metric("Training Time", f"{eval_metrics['train_time']:.2f}s")
     l2.metric(f"Inference (batch {eval_metrics['n_test']})", f"{eval_metrics['infer_time_ms']:.1f} ms")
@@ -800,7 +671,7 @@ with tab3:
 
     st.markdown("---")
     cm = eval_metrics["cm"]
-    st.markdown('<div class="section-header">Confusion Matrix</div>', unsafe_allow_html=True)
+    st.markdown("#### Confusion Matrix")
     cm_df = pd.DataFrame(
         [[cm[0,0], cm[0,1]], [cm[1,0], cm[1,1]]],
         index=["Actual: Retain", "Actual: Churn"],
@@ -809,7 +680,7 @@ with tab3:
     st.dataframe(cm_df, use_container_width=False)
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Feature Importance Ranking</div>', unsafe_allow_html=True)
+    st.markdown("#### Feature Importance Ranking")
     feat_eval = pd.DataFrame({
         "Feature": eval_metrics["features"],
         "Importance": eval_metrics["importances"]
@@ -817,38 +688,31 @@ with tab3:
     st.bar_chart(feat_eval, color="#EB1C24")
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Go / No-Go Evaluation</div>', unsafe_allow_html=True)
+    st.markdown("#### Go / No-Go Evaluation")
 
-    def _status_html(passed):
-        return '<span class="pass-badge">PASS</span>' if passed else '<span class="fail-badge">FAIL</span>'
+    gng = pd.DataFrame([
+        {"Metric": "AUC-ROC", "Target": ">= 0.80", "Actual": f"{eval_metrics['auc']:.4f}",
+         "Status": "PASS" if eval_metrics['auc']>=0.80 else "FAIL"},
+        {"Metric": "Recall (churn)", "Target": ">= 0.75", "Actual": f"{eval_metrics['recall']:.4f}",
+         "Status": "PASS" if eval_metrics['recall']>=0.75 else "FAIL"},
+        {"Metric": "Precision (churn)", "Target": ">= 0.60", "Actual": f"{eval_metrics['precision']:.4f}",
+         "Status": "PASS" if eval_metrics['precision']>=0.60 else "FAIL"},
+        {"Metric": "F1-score", "Target": ">= 0.67", "Actual": f"{eval_metrics['f1']:.4f}",
+         "Status": "PASS" if eval_metrics['f1']>=0.67 else "FAIL"},
+        {"Metric": "Latency / sample", "Target": "< 5s", "Actual": f"{eval_metrics['infer_per_sample_ms']:.3f} ms",
+         "Status": "PASS"},
+    ])
+    st.dataframe(gng, use_container_width=True, hide_index=True)
 
-    gng_data = [
-        ("AUC-ROC", ">= 0.80", f"{eval_metrics['auc']:.4f}", eval_metrics['auc']>=0.80),
-        ("Recall (churn)", ">= 0.75", f"{eval_metrics['recall']:.4f}", eval_metrics['recall']>=0.75),
-        ("Precision (churn)", ">= 0.60", f"{eval_metrics['precision']:.4f}", eval_metrics['precision']>=0.60),
-        ("F1-score", ">= 0.67", f"{eval_metrics['f1']:.4f}", eval_metrics['f1']>=0.67),
-        ("Latency / sample", "< 5s", f"{eval_metrics['infer_per_sample_ms']:.3f} ms", True),
-    ]
-    gng_html = """<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
-    <tr style="border-bottom:2px solid #EB1C24; text-align:left;">
-        <th style="padding:8px;">Metric</th><th style="padding:8px;">Target</th>
-        <th style="padding:8px;">Actual</th><th style="padding:8px;">Status</th></tr>"""
-    for metric, target, actual, passed in gng_data:
-        gng_html += f"""<tr style="border-bottom:1px solid #eee;">
-        <td style="padding:8px;">{metric}</td><td style="padding:8px;">{target}</td>
-        <td style="padding:8px; font-weight:700;">{actual}</td><td style="padding:8px;">{_status_html(passed)}</td></tr>"""
-    gng_html += "</table>"
-    st.markdown(gng_html, unsafe_allow_html=True)
-
-    all_pass = all(p for _,_,_,p in gng_data)
-    st.markdown("")
+    all_pass = (eval_metrics['auc']>=0.80 and eval_metrics['recall']>=0.75
+                and eval_metrics['precision']>=0.60 and eval_metrics['f1']>=0.67)
     if all_pass:
         st.success("**RECOMMENDATION: GO** — All pre-pilot thresholds passed by significant margins.")
     else:
         st.warning("**RECOMMENDATION: NEEDS REVIEW** — Some thresholds not met.")
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Risk Distribution (Test Set)</div>', unsafe_allow_html=True)
+    st.markdown("#### Risk Distribution (Test Set)")
     y_prob = eval_metrics["y_prob"]
     n_te = len(y_prob)
     hi = int((y_prob >= 0.70).sum())
@@ -861,9 +725,9 @@ with tab3:
 
 # ── Tab 4: AI Architecture ───────────────────────────────────────────────────
 with tab4:
-    st.markdown('<div class="section-header">AI Solution Architecture</div>', unsafe_allow_html=True)
+    st.markdown("#### AI Solution Architecture")
 
-    st.markdown('<div class="section-header">Problem Statement</div>', unsafe_allow_html=True)
+    st.markdown("#### Problem Statement")
     st.markdown(
         "Indosat Ooredoo Hutchison (IOH) serves ~95 million subscribers in Indonesia. "
         "Churn pressure comes from SIM consolidation and competitive pricing. "
@@ -873,7 +737,7 @@ with tab4:
     )
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Hybrid AI Architecture</div>', unsafe_allow_html=True)
+    st.markdown("#### Hybrid AI Architecture")
     col_pred, col_gen = st.columns(2)
     with col_pred:
         st.markdown("**Predictive AI (Churn Scoring)**")
@@ -896,7 +760,7 @@ with tab4:
         )
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Data Pipeline</div>', unsafe_allow_html=True)
+    st.markdown("#### Data Pipeline")
     st.code("""Raw Data (CDR, CRM, Billing, CS Tickets, Network Logs)
    -> Daily ingestion + NLP preprocessing (IndoBERT for Bahasa Indonesia sentiment)
    -> Feature engineering (7d/14d/30d rolling windows) + 4-dimension segmentation
@@ -906,24 +770,22 @@ with tab4:
    -> Feedback loop: outcomes (delivered / opened / retained / churned) feed monthly retraining""", language=None)
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Technology Stack</div>', unsafe_allow_html=True)
+    st.markdown("#### Technology Stack")
 
-    stack_html = """<table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
-    <tr style="border-bottom:2px solid #EB1C24; text-align:left;">
-        <th style="padding:8px; width:25%;">Component</th><th style="padding:8px;">Technology</th></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Predictive Model</td><td style="padding:8px;">scikit-learn GradientBoostingClassifier (prod: XGBoost / LightGBM)</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Generative Model</td><td style="padding:8px;">Anthropic Claude Sonnet 4.5 (anthropic Python SDK)</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">UI / Dashboard</td><td style="padding:8px;">Streamlit (deployed on Streamlit Community Cloud)</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Email Delivery</td><td style="padding:8px;">Gmail SMTP (smtplib)</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">WhatsApp Delivery</td><td style="padding:8px;">Twilio WhatsApp API</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Language</td><td style="padding:8px;">Python 3.11 (pandas, numpy, scikit-learn, anthropic, twilio)</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Deployment</td><td style="padding:8px;">GitHub -> Streamlit Cloud auto-deploy on push</td></tr>
-    <tr style="border-bottom:1px solid #eee;"><td style="padding:8px; font-weight:600;">Secrets</td><td style="padding:8px;">Streamlit Cloud Secrets Manager (dev); AWS Secrets Manager (prod)</td></tr>
-    </table>"""
-    st.markdown(stack_html, unsafe_allow_html=True)
+    stack = pd.DataFrame([
+        {"Component": "Predictive Model", "Technology": "scikit-learn GradientBoostingClassifier (prod: XGBoost / LightGBM)"},
+        {"Component": "Generative Model", "Technology": "Anthropic Claude Sonnet 4.5 (anthropic Python SDK)"},
+        {"Component": "UI / Dashboard", "Technology": "Streamlit (deployed on Streamlit Community Cloud)"},
+        {"Component": "Email Delivery", "Technology": "Gmail SMTP (smtplib)"},
+        {"Component": "WhatsApp Delivery", "Technology": "Twilio WhatsApp API"},
+        {"Component": "Language", "Technology": "Python 3.11 (pandas, numpy, scikit-learn, anthropic, twilio)"},
+        {"Component": "Deployment", "Technology": "GitHub -> Streamlit Cloud auto-deploy on push"},
+        {"Component": "Secrets", "Technology": "Streamlit Cloud Secrets Manager (dev); AWS Secrets Manager (prod)"},
+    ])
+    st.dataframe(stack, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    st.markdown('<div class="section-header">Next Steps for Production</div>', unsafe_allow_html=True)
+    st.markdown("#### Next Steps for Production")
     st.markdown(
         "1. **Data quality sprint** — unify legacy Ooredoo + Hutchison subscriber IDs\n"
         "2. **Recalibration** — retrain on real post-merger data (expect AUC 0.80-0.85 range)\n"
