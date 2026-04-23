@@ -640,11 +640,17 @@ div[data-testid="stExpander"] {
 }
 
 /* Tabs */
-.stTabs [data-baseweb="tab-list"] {gap: 0; border-bottom: 2px solid #eee;}
+.stTabs [data-baseweb="tab-list"] {gap: 4px; border-bottom: 2px solid #eee;}
 .stTabs [data-baseweb="tab"] {font-weight: 600; font-size: 0.85rem;}
 
 /* Buttons */
-.stButton > button {border-radius: 8px; font-weight: 600; font-size: 0.8rem;}
+.stButton > button {
+    border-radius: 8px; font-weight: 600; font-size: 0.8rem;
+    padding: 8px 16px; width: 100%;
+}
+
+/* Tab spacing */
+.stTabs [data-baseweb="tab"] {padding: 10px 20px;}
 
 /* Subsection headers */
 .subsection {
@@ -912,7 +918,7 @@ with tab1:
                               f"feedback_{rid}", f"ov_reason_saved_{rid}", f"ai_msg_{rid}"]:
                         st.session_state.pop(k, None)
 
-                d1, d2, d3, d4 = st.columns(4)
+                d1, d2, d3, d4, _ = st.columns([1, 1, 1, 1, 1])
                 d1.button("Approve AI", key=f"approve_{row['id']}", on_click=do_approve, args=(row['id'],))
                 d2.button("Escalate", key=f"escalate_{row['id']}", on_click=do_escalate, args=(row['id'],))
                 d3.button("Mark Safe", key=f"safe_{row['id']}", on_click=do_safe, args=(row['id'],))
@@ -956,7 +962,7 @@ with tab1:
                     st.markdown(f"**Voice Call** to `{row['whatsapp']}`")
                     st.text_area("Call script", call_msg, height=220, key=f"call_{row['id']}", label_visibility="collapsed")
 
-                se1, se2, se3, _ = st.columns([1, 1, 1, 1])
+                se1, se2, se3, _, _ = st.columns([1, 1, 1, 1, 1])
                 if se1.button("Send Email", key=f"se_{row['id']}"):
                     if not gmail_app_pass:
                         st.error("Gmail App Password missing.")
