@@ -612,26 +612,66 @@ def generate_call_script(row, prob, offer, benefit):
                 f"Tukarkan poin Anda di aplikasi my IM3, menu Poin dan Reward. "
                 f"Terima kasih, {first}. Kami senang Anda bersama kami.")
 
-# ── Minimal styling (McKinsey-clean) ──────────────────────────────────────────
+# ── Indosat Clean Styling ─────────────────────────────────────────────────────
 st.markdown("""<style>
-[data-testid="stMetric"] {background:#f8f9fa; padding:16px; border-radius:6px;}
-[data-testid="stMetricLabel"] {font-size:0.75rem; color:#888; text-transform:uppercase; letter-spacing:0.5px;}
-[data-testid="stMetricValue"] {font-size:1.4rem; font-weight:700; color:#1a1a1a;}
-div[data-testid="stExpander"] {border:1px solid #e8e8e8; border-radius:6px;}
-.block-container {padding-top:2rem; max-width:1100px;}
-.risk-box {padding:20px; border-radius:8px; margin:8px 0;}
-.risk-box-high {background:#FDEDED; border-left:4px solid #C62828;}
-.risk-box-med {background:#FFF8E1; border-left:4px solid #E65100;}
-.risk-box-low {background:#E8F5E9; border-left:4px solid #2E7D32;}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Global font */
+html, body, [class*="css"] {font-family: 'Inter', sans-serif !important;}
+
+/* Tighter container */
+.block-container {padding-top:1.5rem; max-width:1100px;}
+
+/* Metric cards */
+[data-testid="stMetric"] {
+    background: #fafafa;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid #eee;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.7rem; color: #999;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 600;
+}
+[data-testid="stMetricValue"] {font-size: 1.3rem; font-weight: 700;}
+
+/* Expander */
+div[data-testid="stExpander"] {
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] {gap: 0; border-bottom: 2px solid #eee;}
+.stTabs [data-baseweb="tab"] {font-weight: 600; font-size: 0.85rem;}
+
+/* Tables */
+[data-testid="stDataFrame"] {border-radius: 8px;}
+
+/* Buttons */
+.stButton > button {border-radius: 6px; font-weight: 600; font-size: 0.8rem;}
+
+/* Risk boxes for What-If Simulator */
+.risk-box {padding: 20px; border-radius: 8px; margin: 8px 0;}
+.risk-box-high {background: #FDEDED; border-left: 4px solid #C62828;}
+.risk-box-med {background: #FFF8E1; border-left: 4px solid #E65100;}
+.risk-box-low {background: #E8F5E9; border-left: 4px solid #2E7D32;}
+
+/* Hide Streamlit branding */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
 </style>""", unsafe_allow_html=True)
 
 def risk_badge_html(prob):
+    base = "display:inline-block; padding:4px 12px; border-radius:4px; font-weight:700; font-size:0.8rem; letter-spacing:0.3px;"
     if prob >= 0.70:
-        return f'<span class="risk-badge risk-high">HIGH RISK {prob*100:.1f}%</span>'
+        return f'<span style="{base} background:#FDEDED; color:#C62828; border:1px solid #EF9A9A;">HIGH RISK</span>'
     elif prob >= 0.40:
-        return f'<span class="risk-badge risk-med">MEDIUM {prob*100:.1f}%</span>'
+        return f'<span style="{base} background:#FFF8E1; color:#E65100; border:1px solid #FFE082;">MEDIUM RISK</span>'
     else:
-        return f'<span class="risk-badge risk-low">LOW RISK {prob*100:.1f}%</span>'
+        return f'<span style="{base} background:#E8F5E9; color:#2E7D32; border:1px solid #A5D6A7;">LOW RISK</span>'
 
 def risk_box_class(prob):
     if prob >= 0.70: return "risk-box risk-box-high"
@@ -650,9 +690,10 @@ def apply_overrides(ids, probs):
     return result
 
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
-st.title("Indosat CRM AI")
-st.caption("Customer Intelligence Platform  /  Churn Prediction  /  Personalized Retention")
-st.markdown("")
+st.markdown("""<div style="margin-bottom:24px;">
+    <div style="font-size:1.8rem; font-weight:700; color:#EB1C24; letter-spacing:-0.5px;">Indosat CRM AI</div>
+    <div style="font-size:0.9rem; color:#888; margin-top:2px;">Customer Intelligence Platform &nbsp;/&nbsp; Churn Prediction &nbsp;/&nbsp; Personalized Retention</div>
+</div>""", unsafe_allow_html=True)
 
 tab0, tab1, tab2, tab5, tab3, tab4 = st.tabs([
     "Dashboard", "Search & Predict", "All Customers",
@@ -787,9 +828,9 @@ with tab1:
 
                 # ── Step tracker ──────────────────────────────────────
                 def step_style(active, done):
-                    if done: return "background:#2E7D32; color:white;"
-                    elif active: return "background:#EB1C24; color:white;"
-                    else: return "background:#e0e0e0; color:#999;"
+                    if done: return "background:#2E7D32; color:white; border:none;"
+                    elif active: return "background:#EB1C24; color:white; border:none;"
+                    else: return "background:transparent; color:#bbb; border:1px solid #ddd;"
 
                 s1_done = True
                 s2_done = is_reviewed
