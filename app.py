@@ -612,7 +612,28 @@ st.markdown("""<style>
 [data-testid="stMetricValue"] {font-size:1.4rem; font-weight:700; color:#1a1a1a;}
 div[data-testid="stExpander"] {border:1px solid #e8e8e8; border-radius:6px;}
 .block-container {padding-top:2rem; max-width:1100px;}
+.risk-badge {display:inline-block; padding:3px 12px; border-radius:4px; font-weight:700; font-size:0.85rem; letter-spacing:0.3px;}
+.risk-high {background:#FDEDED; color:#C62828; border:1px solid #EF9A9A;}
+.risk-med {background:#FFF8E1; color:#E65100; border:1px solid #FFE082;}
+.risk-low {background:#E8F5E9; color:#2E7D32; border:1px solid #A5D6A7;}
+.risk-box {padding:20px; border-radius:8px; margin:8px 0;}
+.risk-box-high {background:#FDEDED; border-left:4px solid #C62828;}
+.risk-box-med {background:#FFF8E1; border-left:4px solid #E65100;}
+.risk-box-low {background:#E8F5E9; border-left:4px solid #2E7D32;}
 </style>""", unsafe_allow_html=True)
+
+def risk_badge_html(prob):
+    if prob >= 0.70:
+        return f'<span class="risk-badge risk-high">HIGH RISK {prob*100:.1f}%</span>'
+    elif prob >= 0.40:
+        return f'<span class="risk-badge risk-med">MEDIUM {prob*100:.1f}%</span>'
+    else:
+        return f'<span class="risk-badge risk-low">LOW RISK {prob*100:.1f}%</span>'
+
+def risk_box_class(prob):
+    if prob >= 0.70: return "risk-box risk-box-high"
+    elif prob >= 0.40: return "risk-box risk-box-med"
+    else: return "risk-box risk-box-low"
 
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
 st.title("Indosat CRM AI")
@@ -718,7 +739,8 @@ with tab1:
             prob = row["prob"]
             rlabel, rcls = risk_label(prob)
 
-            with st.expander(f"{row['name']}  |  {row['email']}  |  {row['plan_type']}  |  {rlabel} ({prob*100:.1f}%)"):
+            risk_dot = "🔴" if prob>=0.70 else "🟠" if prob>=0.40 else "🟢"
+            with st.expander(f"{risk_dot}  {row['name']}  |  {row['plan_type']}  |  {rlabel} ({prob*100:.1f}%)"):
 
                 st.markdown("")
                 p1,p2,p3,p4 = st.columns(4)
@@ -738,12 +760,22 @@ with tab1:
                 drivers = get_drivers(row)
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
 
-                pred_col, driver_col = st.columns([1, 2], gap="large")
-                with pred_col:
-                    st.metric("Churn Probability", f"{prob*100:.1f}%", rlabel)
-                with driver_col:
-                    for i, d in enumerate(drivers):
-                        st.markdown(f"**{i+1}.** {d}")
+                box_cls = risk_box_class(prob)
+                badge = risk_badge_html(prob)
+                driver_html = "".join(f"<div style='margin:4px 0;'><strong>{i+1}.</strong> {d}</div>" for i, d in enumerate(drivers))
+                st.markdown(f"""<div class="{box_cls}">
+                    <div style="display:flex; align-items:flex-start; gap:32px; flex-wrap:wrap;">
+                        <div style="min-width:160px;">
+                            <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Churn Probability</div>
+                            <div style="font-size:2rem; font-weight:700; margin-bottom:8px;">{prob*100:.1f}%</div>
+                            {badge}
+                        </div>
+                        <div style="flex:1; min-width:250px;">
+                            <div style="color:#888; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px;">Risk Drivers</div>
+                            {driver_html}
+                        </div>
+                    </div>
+                </div>""", unsafe_allow_html=True)
 
                 # ── Actions ───────────────────────────────────────────
                 st.markdown("")
@@ -835,7 +867,7 @@ with tab2:
     all_probs = model.predict_proba(Xi2)[:,1]
     disp = df.copy()
     disp["Churn Risk"]  = (all_probs*100).round(1).astype(str)+"%"
-    disp["Risk Level"]  = ["HIGH" if p>=0.70 else "MED" if p>=0.40 else "LOW" for p in all_probs]
+    disp["Risk Level"]  = ["🔴 HIGH" if p>=0.70 else "🟠 MED" if p>=0.40 else "🟢 LOW" for p in all_probs]
     disp["Loyalty"]     = disp["loyalty"].apply(lambda x: LOYALTY[x])
     disp["Interest"]    = disp["interest"].apply(lambda x: INTEREST[x])
     disp["ARPU"]        = disp["arpu"].apply(lambda x: f"Rp {x:,}")
