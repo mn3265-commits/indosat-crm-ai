@@ -508,9 +508,19 @@ Terima kasih, {first}! Kami senang kamu bersama kami.
 
 _Indosat Care - 185_"""
 
+# ── Minimal styling (McKinsey-clean) ──────────────────────────────────────────
+st.markdown("""<style>
+[data-testid="stMetric"] {background:#f8f9fa; padding:16px; border-radius:6px;}
+[data-testid="stMetricLabel"] {font-size:0.75rem; color:#888; text-transform:uppercase; letter-spacing:0.5px;}
+[data-testid="stMetricValue"] {font-size:1.4rem; font-weight:700; color:#1a1a1a;}
+div[data-testid="stExpander"] {border:1px solid #e8e8e8; border-radius:6px;}
+.block-container {padding-top:2rem; max-width:1100px;}
+</style>""", unsafe_allow_html=True)
+
 # ── MAIN UI ──────────────────────────────────────────────────────────────────
 st.title("Indosat CRM AI")
-st.caption("Customer Intelligence Platform — AI-powered churn prediction and personalized retention")
+st.caption("Customer Intelligence Platform  /  Churn Prediction  /  Personalized Retention")
+st.markdown("")
 
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "Dashboard", "Search & Predict", "All Customers",
@@ -518,8 +528,6 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
 
 # ── Tab 0: Dashboard ─────────────────────────────────────────────────────────
 with tab0:
-    st.subheader("Executive Summary")
-
     Xi_all = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     probs_all = model.predict_proba(Xi_all)[:,1]
     n_total = len(df)
@@ -529,52 +537,54 @@ with tab0:
     n_post = int((df["plan_type"]=="Postpaid").sum())
     n_pre = n_total - n_post
 
-    d1, d2, d3, d4, d5 = st.columns(5)
+    st.markdown("")
+    d1, d2, d3, d4 = st.columns(4)
     d1.metric("Total Customers", n_total)
-    d2.metric("High Risk", n_high, f"{n_high/n_total*100:.0f}%")
-    d3.metric("Medium Risk", n_med, f"{n_med/n_total*100:.0f}%")
-    d4.metric("Low Risk", n_low, f"{n_low/n_total*100:.0f}%")
-    d5.metric("Postpaid / Prepaid", f"{n_post} / {n_pre}")
+    d2.metric("High Risk", n_high, f"{n_high/n_total*100:.0f}% of base")
+    d3.metric("Medium Risk", n_med, f"{n_med/n_total*100:.0f}% of base")
+    d4.metric("Low Risk", n_low, f"{n_low/n_total*100:.0f}% of base")
 
-    st.markdown("---")
-    col_left, col_right = st.columns(2)
+    st.markdown("")
+    st.markdown("")
+    col_left, col_right = st.columns(2, gap="large")
 
     with col_left:
-        st.markdown("#### Risk Distribution")
+        st.markdown("**Risk Distribution**")
         risk_df = pd.DataFrame({
             "Risk Level": ["High (>=70%)", "Medium (40-70%)", "Low (<40%)"],
-            "Count": [n_high, n_med, n_low]
+            "Subscribers": [n_high, n_med, n_low]
         }).set_index("Risk Level")
         st.bar_chart(risk_df, color="#EB1C24")
 
     with col_right:
-        st.markdown("#### Feature Importance")
+        st.markdown("**Feature Importance**")
         feat_df = pd.DataFrame({
             "Feature": eval_metrics["features"],
-            "Importance": eval_metrics["importances"]
-        }).sort_values("Importance", ascending=False).set_index("Feature")
-        st.bar_chart(feat_df, color="#EB1C24")
+            "Weight": eval_metrics["importances"]
+        }).sort_values("Weight", ascending=False).set_index("Feature")
+        st.bar_chart(feat_df, color="#555555")
 
-    st.markdown("---")
-    st.markdown("#### Model Performance (Test Set)")
-    k1, k2, k3, k4, k5 = st.columns(5)
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Model Performance** (held-out test set, n=450)")
+    k1, k2, k3, k4 = st.columns(4)
     k1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
-    k2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
-    k3.metric("Precision", f"{eval_metrics['precision']:.4f}")
-    k4.metric("Recall", f"{eval_metrics['recall']:.4f}")
-    k5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
+    k2.metric("Precision", f"{eval_metrics['precision']:.4f}")
+    k3.metric("Recall", f"{eval_metrics['recall']:.4f}")
+    k4.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
 
-    st.markdown("---")
-    st.markdown("#### Hybrid AI Architecture")
-    st.info(
-        "**Predictive AI** — GradientBoostingClassifier scores churn risk per subscriber.  \n"
-        "**Generative AI** — Anthropic Claude Sonnet 4.5 generates personalized Bahasa Indonesia retention messages.  \n"
-        "**Delivery** — Email (Gmail SMTP) + WhatsApp (Twilio API) with rule-based template fallback."
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Hybrid AI Approach**")
+    st.markdown(
+        "**Predictive AI** scores churn risk per subscriber using GradientBoostingClassifier. "
+        "**Generative AI** (Claude Sonnet 4.5) creates personalized Bahasa Indonesia retention messages. "
+        "**Delivery** via Email (Gmail SMTP) and WhatsApp (Twilio API) with rule-based template fallback."
     )
 
 # ── Tab 1: Search & Predict ──────────────────────────────────────────────────
 with tab1:
-    st.markdown("#### Search Customer")
+    st.markdown("")
     c1, c2, c3 = st.columns([2,1,1])
     with c1:
         search = st.text_input("Search by name, email, WhatsApp, or ID", placeholder="e.g. Agung, gmail, IOH-0003...")
@@ -613,48 +623,40 @@ with tab1:
 
             with st.expander(f"{row['name']}  |  {row['email']}  |  {row['plan_type']}  |  {rlabel} ({prob*100:.1f}%)"):
 
-                st.markdown("#### Customer Profile")
-                p1,p2,p3,p4,p5 = st.columns(5)
+                st.markdown("")
+                p1,p2,p3,p4 = st.columns(4)
                 p1.metric("ID", row["id"])
-                p2.metric("Email", row["email"])
-                p3.metric("WhatsApp", row["whatsapp"])
-                p4.metric("City", row["city"])
-                p5.metric("Plan Type", row["plan_type"])
+                p2.metric("Plan", row["plan"])
+                p3.metric("City", row["city"])
+                p4.metric("Tenure", f"{row['tenure']}d", tseg(row["tenure"]))
 
-                p6,p7,p8,p9,p10 = st.columns(5)
-                p6.metric("Active Plan", row["plan"])
-                p7.metric("Tenure", f"{row['tenure']}d", tseg(row["tenure"]))
-                p8.metric("ARPU/mo", f"Rp {row['arpu']:,}", aseg(row["arpu"]))
-                p9.metric("Last Top-up", row["last_active"])
-                p10.metric("Complaints", f"{row['complaints']} open")
+                p5,p6,p7,p8 = st.columns(4)
+                p5.metric("ARPU/mo", f"Rp {row['arpu']:,}", aseg(row["arpu"]))
+                p6.metric("Loyalty", LOYALTY[row['loyalty']])
+                p7.metric("Data Drop", f"{row['data_drop']:.0f}%")
+                p8.metric("Complaints", f"{row['complaints']} open")
+                st.markdown("")
 
-                p11,p12,p13,p14 = st.columns(4)
-                p11.metric("Loyalty", LOYALTY[row['loyalty']])
-                p12.metric("Interest", INTEREST[row['interest']])
-                p13.metric("Data Drop", f"{row['data_drop']:.0f}%")
-                p14.metric("Network Score", f"{row['network']}/5")
-                st.markdown("---")
-
-                st.markdown("#### AI Churn Prediction")
+                st.markdown("**AI Churn Prediction**")
                 pa, pb = st.columns([1,2])
                 with pa:
                     st.metric("Churn Probability", f"{prob*100:.1f}%", rlabel)
                 with pb:
                     drivers = get_drivers(row)
-                    st.markdown("**Top Risk Drivers:**")
+                    st.markdown("**Top Risk Drivers**")
                     for i,d in enumerate(drivers): st.markdown(f"{i+1}. {d}")
-                st.markdown("---")
 
-                st.markdown("#### Marketer Action Plan")
+                st.markdown("")
+                st.markdown("**Recommended Actions**")
                 actions = marketer_actions(prob, row["plan_type"], row["interest"], row["loyalty"])
                 for a in actions: st.markdown(f"- {a}")
-                st.markdown("---")
+                st.markdown("")
 
                 offer, benefit = get_offer(row["interest"], row["plan_type"])
                 subject, email_body = generate_email_content(row, prob, offer, benefit)
                 wa_msg = generate_whatsapp(row, prob, offer, benefit)
 
-                st.markdown("#### Personalized Messages")
+                st.markdown("**Personalized Messages**")
                 mt1, mt2 = st.tabs(["Email", "WhatsApp"])
 
                 with mt1:
@@ -666,8 +668,8 @@ with tab1:
                     st.markdown(f"**To:** `{row['whatsapp']}`")
                     st.text_area("WhatsApp Message", wa_msg, height=220, key=f"wa_{row['id']}")
 
-                st.markdown("---")
-                st.markdown("#### Send to Customer")
+                st.markdown("")
+                st.markdown("**Send to Customer**")
                 now = datetime.now().strftime("%H:%M:%S")
                 b1,b2,b3 = st.columns(3)
 
@@ -706,7 +708,7 @@ with tab1:
 
 # ── Tab 2: All Customers ─────────────────────────────────────────────────────
 with tab2:
-    st.markdown("#### All Customers Overview")
+    st.markdown("")
     Xi2 = df[["tenure","arpu","loyalty","interest","data_drop","topup_days","complaints","network"]].values
     all_probs = model.predict_proba(Xi2)[:,1]
     disp = df.copy()
@@ -715,77 +717,73 @@ with tab2:
     disp["Loyalty"]     = disp["loyalty"].apply(lambda x: LOYALTY[x])
     disp["Interest"]    = disp["interest"].apply(lambda x: INTEREST[x])
     disp["ARPU"]        = disp["arpu"].apply(lambda x: f"Rp {x:,}")
-    show = disp[["id","name","email","whatsapp","plan_type","city","tenure","ARPU","Loyalty","Interest","Churn Risk","Risk Level"]].rename(
-        columns={"id":"ID","name":"Name","email":"Email","whatsapp":"WhatsApp",
+    show = disp[["id","name","email","plan_type","city","tenure","ARPU","Loyalty","Churn Risk","Risk Level"]].rename(
+        columns={"id":"ID","name":"Name","email":"Email",
                  "plan_type":"Plan","city":"City","tenure":"Tenure(d)"})
     st.dataframe(show, use_container_width=True, hide_index=True)
-    st.markdown("---")
+
+    st.markdown("")
     total=len(df); high=sum(all_probs>=0.70); med=sum((all_probs>=0.40)&(all_probs<0.70)); low=sum(all_probs<0.40); post=len(df[df["plan_type"]=="Postpaid"])
-    m1,m2,m3,m4,m5 = st.columns(5)
-    m1.metric("Total Customers", total)
+    m1,m2,m3,m4 = st.columns(4)
+    m1.metric("Total", total)
     m2.metric("High Risk", high, f"{high/total*100:.0f}%")
     m3.metric("Medium Risk", med, f"{med/total*100:.0f}%")
     m4.metric("Low Risk", low, f"{low/total*100:.0f}%")
-    m5.metric("Postpaid", post, f"{post/total*100:.0f}% of total")
 
 # ── Tab 3: Model Evaluation ──────────────────────────────────────────────────
 with tab3:
-    st.markdown("#### Prototype Model Evaluation")
-    st.markdown("Evaluation on held-out test set using stratified split. Model: `GradientBoostingClassifier(n_estimators=100, max_depth=4)`.")
+    st.markdown("")
+    st.markdown("Evaluation on held-out test set (stratified split). Model: GradientBoostingClassifier, 100 trees, max depth 4.")
 
-    st.markdown("#### Dataset Split")
-    sp1, sp2, sp3 = st.columns(3)
-    sp1.metric("Train", f"{eval_metrics['n_train']} samples")
-    sp2.metric("Validation", f"{eval_metrics['n_val']} samples")
-    sp3.metric("Test", f"{eval_metrics['n_test']} samples")
-
-    st.markdown("---")
-    st.markdown("#### Performance Metrics")
-    e1, e2, e3, e4, e5 = st.columns(5)
+    st.markdown("")
+    e1, e2, e3, e4 = st.columns(4)
     e1.metric("AUC-ROC", f"{eval_metrics['auc']:.4f}")
-    e2.metric("Accuracy", f"{eval_metrics['accuracy']:.4f}")
-    e3.metric("Precision", f"{eval_metrics['precision']:.4f}")
-    e4.metric("Recall", f"{eval_metrics['recall']:.4f}")
-    e5.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
+    e2.metric("Precision", f"{eval_metrics['precision']:.4f}")
+    e3.metric("Recall", f"{eval_metrics['recall']:.4f}")
+    e4.metric("F1-Score", f"{eval_metrics['f1']:.4f}")
 
-    st.markdown("---")
-    st.markdown("#### Latency")
-    l1, l2, l3 = st.columns(3)
-    l1.metric("Training Time", f"{eval_metrics['train_time']:.2f}s")
-    l2.metric(f"Inference (batch {eval_metrics['n_test']})", f"{eval_metrics['infer_time_ms']:.1f} ms")
-    l3.metric("Per-sample Latency", f"{eval_metrics['infer_per_sample_ms']:.3f} ms")
+    st.markdown("")
+    ev_left, ev_right = st.columns(2, gap="large")
 
-    st.markdown("---")
-    cm = eval_metrics["cm"]
-    st.markdown("#### Confusion Matrix")
-    cm_df = pd.DataFrame(
-        [[cm[0,0], cm[0,1]], [cm[1,0], cm[1,1]]],
-        index=["Actual: Retain", "Actual: Churn"],
-        columns=["Predicted: Retain", "Predicted: Churn"]
-    )
-    st.dataframe(cm_df, use_container_width=False)
+    with ev_left:
+        st.markdown("**Confusion Matrix**")
+        cm = eval_metrics["cm"]
+        cm_df = pd.DataFrame(
+            [[cm[0,0], cm[0,1]], [cm[1,0], cm[1,1]]],
+            index=["Actual: Retain", "Actual: Churn"],
+            columns=["Pred: Retain", "Pred: Churn"]
+        )
+        st.dataframe(cm_df, use_container_width=True)
 
-    st.markdown("---")
-    st.markdown("#### Feature Importance Ranking")
-    feat_eval = pd.DataFrame({
-        "Feature": eval_metrics["features"],
-        "Importance": eval_metrics["importances"]
-    }).sort_values("Importance", ascending=False).set_index("Feature")
-    st.bar_chart(feat_eval, color="#EB1C24")
+        st.markdown("")
+        st.markdown("**Latency**")
+        l1, l2 = st.columns(2)
+        l1.metric("Training Time", f"{eval_metrics['train_time']:.2f}s")
+        l2.metric("Per-sample", f"{eval_metrics['infer_per_sample_ms']:.3f} ms")
 
-    st.markdown("---")
-    st.markdown("#### Go / No-Go Evaluation")
+    with ev_right:
+        st.markdown("**Feature Importance**")
+        feat_eval = pd.DataFrame({
+            "Feature": eval_metrics["features"],
+            "Importance": eval_metrics["importances"]
+        }).sort_values("Importance", ascending=False).set_index("Feature")
+        st.bar_chart(feat_eval, color="#555555")
+
+    # ── Go / No-Go ────────────────────────────────────────────────────────────
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Go / No-Go Evaluation**")
 
     gng = pd.DataFrame([
         {"Metric": "AUC-ROC", "Target": ">= 0.80", "Actual": f"{eval_metrics['auc']:.4f}",
          "Status": "PASS" if eval_metrics['auc']>=0.80 else "FAIL"},
-        {"Metric": "Recall (churn)", "Target": ">= 0.75", "Actual": f"{eval_metrics['recall']:.4f}",
+        {"Metric": "Recall", "Target": ">= 0.75", "Actual": f"{eval_metrics['recall']:.4f}",
          "Status": "PASS" if eval_metrics['recall']>=0.75 else "FAIL"},
-        {"Metric": "Precision (churn)", "Target": ">= 0.60", "Actual": f"{eval_metrics['precision']:.4f}",
+        {"Metric": "Precision", "Target": ">= 0.60", "Actual": f"{eval_metrics['precision']:.4f}",
          "Status": "PASS" if eval_metrics['precision']>=0.60 else "FAIL"},
         {"Metric": "F1-score", "Target": ">= 0.67", "Actual": f"{eval_metrics['f1']:.4f}",
          "Status": "PASS" if eval_metrics['f1']>=0.67 else "FAIL"},
-        {"Metric": "Latency / sample", "Target": "< 5s", "Actual": f"{eval_metrics['infer_per_sample_ms']:.3f} ms",
+        {"Metric": "Latency", "Target": "< 5s", "Actual": f"{eval_metrics['infer_per_sample_ms']:.3f} ms",
          "Status": "PASS"},
     ])
     st.dataframe(gng, use_container_width=True, hide_index=True)
@@ -793,29 +791,17 @@ with tab3:
     all_pass = (eval_metrics['auc']>=0.80 and eval_metrics['recall']>=0.75
                 and eval_metrics['precision']>=0.60 and eval_metrics['f1']>=0.67)
     if all_pass:
-        st.success("**RECOMMENDATION: GO** — All pre-pilot thresholds passed by significant margins.")
+        st.success("RECOMMENDATION: GO. All pre-pilot thresholds passed.")
     else:
-        st.warning("**RECOMMENDATION: NEEDS REVIEW** — Some thresholds not met.")
-
-    st.markdown("---")
-    st.markdown("#### Risk Distribution (Test Set)")
-    y_prob = eval_metrics["y_prob"]
-    n_te = len(y_prob)
-    hi = int((y_prob >= 0.70).sum())
-    mi = int(((y_prob >= 0.40) & (y_prob < 0.70)).sum())
-    li = int((y_prob < 0.40).sum())
-    r1, r2, r3 = st.columns(3)
-    r1.metric("HIGH risk (>=70%)", f"{hi} ({100*hi/n_te:.1f}%)")
-    r2.metric("MEDIUM risk (40-70%)", f"{mi} ({100*mi/n_te:.1f}%)")
-    r3.metric("LOW risk (<40%)", f"{li} ({100*li/n_te:.1f}%)")
+        st.warning("RECOMMENDATION: NEEDS REVIEW. Some thresholds not met.")
 
     # ── Baseline Comparison ───────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("#### Baseline Comparison")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Baseline Comparison**")
     st.markdown(
-        "Three models evaluated on the same held-out test set. "
-        "The rule-based heuristic uses simple threshold rules (tenure < 100, data drop > 50%, complaints >= 2) "
-        "with no machine learning. Logistic Regression is a standard linear baseline."
+        "Three models evaluated on the same test set. Rule-based heuristic uses simple threshold rules "
+        "(tenure < 100, data drop > 50%, complaints >= 2). Logistic Regression is a standard linear baseline."
     )
     baselines = eval_metrics["baselines"]
     bl_rows = []
@@ -826,15 +812,8 @@ with tab3:
             "Precision": f"{m['precision']:.4f}",
             "Recall": f"{m['recall']:.4f}",
             "F1": f"{m['f1']:.4f}",
-            "Accuracy": f"{m['accuracy']:.4f}",
         })
     st.dataframe(pd.DataFrame(bl_rows), use_container_width=True, hide_index=True)
-
-    bl_chart = pd.DataFrame({
-        name: {"AUC-ROC": m["auc"], "Precision": m["precision"], "Recall": m["recall"], "F1": m["f1"]}
-        for name, m in baselines.items()
-    }).T
-    st.bar_chart(bl_chart, color=["#EB1C24", "#FF6B6B", "#FFA07A", "#2196F3"])
 
     gb_auc = baselines["GradientBoosting"]["auc"]
     lr_auc = baselines["Logistic Regression"]["auc"]
@@ -845,15 +824,16 @@ with tab3:
         f"The ML approach captures non-linear feature interactions that simple rules miss."
     )
 
-    # ── Business Impact Metrics ───────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("#### Business Impact Estimation")
+    # ── Business Impact ───────────────────────────────────────────────────────
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Business Impact Estimation**")
     st.markdown(
         "Projections based on Indonesian telecom industry benchmarks: "
-        "average monthly churn rate of 3-5% (GSMA, 2023), "
-        "customer acquisition cost (CAC) of Rp 150,000-300,000, "
-        "average ARPU of Rp 40,000/month (Indosat FY2024 annual report), "
-        "and average customer lifetime of 24 months."
+        "monthly churn rate 3-5% (GSMA Intelligence, 2023), "
+        "CAC Rp 150,000-300,000, "
+        "ARPU Rp 40,000/month (Indosat FY2024 annual report), "
+        "average customer lifetime 24 months."
     )
 
     subscriber_base = 95_000_000
@@ -863,49 +843,48 @@ with tab3:
     avg_cac = 225_000
     avg_lifetime_months = 24
     model_recall = eval_metrics["recall"]
-    model_precision = eval_metrics["precision"]
     retention_success_rate = 0.25
     identifiable = int(monthly_churners * model_recall)
     retained = int(identifiable * retention_success_rate)
     revenue_saved_monthly = retained * avg_arpu * avg_lifetime_months
-    cac_saved_monthly = retained * avg_cac
-
-    biz = pd.DataFrame([
-        {"Metric": "IOH subscriber base", "Value": f"{subscriber_base:,}", "Source": "Indosat FY2024"},
-        {"Metric": "Monthly churn rate", "Value": "3.5%", "Source": "GSMA Intelligence 2023"},
-        {"Metric": "Monthly churners (est.)", "Value": f"{monthly_churners:,}", "Source": "Calculated"},
-        {"Metric": "Average ARPU", "Value": f"Rp {avg_arpu:,}/mo", "Source": "Indosat FY2024"},
-        {"Metric": "Customer acquisition cost (CAC)", "Value": f"Rp {avg_cac:,}", "Source": "Industry benchmark"},
-        {"Metric": "Model recall (churners identified)", "Value": f"{model_recall:.1%}", "Source": "Prototype evaluation"},
-        {"Metric": "Churners flagged by model/month", "Value": f"{identifiable:,}", "Source": "Calculated"},
-        {"Metric": "Estimated retention rate (with offer)", "Value": "25%", "Source": "Industry benchmark"},
-        {"Metric": "Subscribers retained/month", "Value": f"{retained:,}", "Source": "Calculated"},
-        {"Metric": "Lifetime revenue saved/month", "Value": f"Rp {revenue_saved_monthly:,}", "Source": "Calculated"},
-        {"Metric": "CAC savings/month", "Value": f"Rp {cac_saved_monthly:,}", "Source": "Calculated"},
-        {"Metric": "Annual revenue impact (est.)", "Value": f"Rp {revenue_saved_monthly * 12:,}", "Source": "Calculated"},
-    ])
-    st.dataframe(biz, use_container_width=True, hide_index=True)
 
     bi1, bi2, bi3 = st.columns(3)
-    bi1.metric("Subscribers Retained/Month", f"{retained:,}")
-    bi2.metric("Monthly Revenue Saved", f"Rp {revenue_saved_monthly/1e9:.1f}B")
-    bi3.metric("Annual Impact (est.)", f"Rp {revenue_saved_monthly*12/1e12:.2f}T")
+    bi1.metric("Churners Flagged/Month", f"{identifiable:,}")
+    bi2.metric("Subscribers Retained", f"{retained:,}/mo")
+    bi3.metric("Revenue Saved", f"Rp {revenue_saved_monthly/1e9:.1f}B/mo")
 
-    # ── Edge Cases & Failure Modes ────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("#### Edge Cases and Known Failure Modes")
+    with st.expander("Full business impact breakdown"):
+        biz = pd.DataFrame([
+            {"Metric": "IOH subscriber base", "Value": f"{subscriber_base:,}", "Source": "Indosat FY2024"},
+            {"Metric": "Monthly churn rate", "Value": "3.5%", "Source": "GSMA Intelligence 2023"},
+            {"Metric": "Monthly churners (est.)", "Value": f"{monthly_churners:,}", "Source": "Calculated"},
+            {"Metric": "Average ARPU", "Value": f"Rp {avg_arpu:,}/mo", "Source": "Indosat FY2024"},
+            {"Metric": "Customer acquisition cost", "Value": f"Rp {avg_cac:,}", "Source": "Industry benchmark"},
+            {"Metric": "Model recall", "Value": f"{model_recall:.1%}", "Source": "Prototype eval"},
+            {"Metric": "Churners flagged/month", "Value": f"{identifiable:,}", "Source": "Calculated"},
+            {"Metric": "Retention rate (with offer)", "Value": "25%", "Source": "Industry benchmark"},
+            {"Metric": "Subscribers retained/month", "Value": f"{retained:,}", "Source": "Calculated"},
+            {"Metric": "Lifetime revenue saved/month", "Value": f"Rp {revenue_saved_monthly:,}", "Source": "Calculated"},
+            {"Metric": "Annual revenue impact", "Value": f"Rp {revenue_saved_monthly*12:,}", "Source": "Calculated"},
+        ])
+        st.dataframe(biz, use_container_width=True, hide_index=True)
+
+    # ── Edge Cases ────────────────────────────────────────────────────────────
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Edge Cases and Known Failure Modes**")
     st.markdown(
-        "The model was tested under four simulated stress scenarios drawn from real Indonesian telecom operations. "
-        "Each scenario perturbs the test data to simulate a market event the model was not trained to handle. "
-        "These failure modes highlight why human oversight and regular retraining are essential."
+        "Four stress scenarios drawn from real Indonesian telecom operations. Each perturbs the test data "
+        "to simulate a market event the model was not trained for."
     )
 
     for scenario, data in eval_metrics["edge_cases"].items():
-        with st.expander(f"{scenario} (AUC: {data['auc']:.4f})"):
-            st.markdown(f"**What happens:** {data['desc']}")
+        with st.expander(f"{scenario}  /  AUC: {data['auc']:.4f}"):
+            st.markdown(data['desc'])
+            st.markdown("")
             ec1, ec2, ec3, ec4 = st.columns(4)
             ec1.metric("AUC-ROC", f"{data['auc']:.4f}",
-                       f"{data['auc'] - eval_metrics['auc']:+.4f} vs normal")
+                       f"{data['auc'] - eval_metrics['auc']:+.4f}")
             ec2.metric("Precision", f"{data['precision']:.4f}",
                        f"{data['precision'] - eval_metrics['precision']:+.4f}")
             ec3.metric("Recall", f"{data['recall']:.4f}",
@@ -915,20 +894,19 @@ with tab3:
 
 # ── Tab 4: AI Architecture ───────────────────────────────────────────────────
 with tab4:
-    st.markdown("#### AI Solution Architecture")
-
-    st.markdown("#### Problem Statement")
+    st.markdown("")
     st.markdown(
         "Indosat Ooredoo Hutchison (IOH) serves ~95 million subscribers in Indonesia. "
         "Churn pressure comes from SIM consolidation and competitive pricing. "
-        "Retention today is **reactive** — teams respond only after a customer has churned. "
-        "There is no system to identify at-risk subscribers in advance and deliver "
+        "Retention today is **reactive**: teams respond only after a customer has churned. "
+        "This system identifies at-risk subscribers in advance and delivers "
         "personalized retention offers before they leave."
     )
 
-    st.markdown("---")
-    st.markdown("#### Hybrid AI Architecture")
-    col_pred, col_gen = st.columns(2)
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Hybrid AI Architecture**")
+    col_pred, col_gen = st.columns(2, gap="large")
     with col_pred:
         st.markdown("**Predictive AI (Churn Scoring)**")
         st.markdown(
@@ -949,8 +927,9 @@ with tab4:
             "- **Fallback:** Rule-based templates if API is unavailable"
         )
 
-    st.markdown("---")
-    st.markdown("#### AI Factory Architecture Diagram")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**AI Factory Architecture**")
     st.graphviz_chart("""
     digraph AIFactory {
         rankdir=TB;
@@ -1012,18 +991,9 @@ with tab4:
     }
     """)
 
-    st.markdown("---")
-    st.markdown("#### Data Pipeline")
-    st.code("""Raw Data (CDR, CRM, Billing, CS Tickets, Network Logs)
-   -> Daily ingestion + NLP preprocessing (IndoBERT for Bahasa Indonesia sentiment)
-   -> Feature engineering (7d/14d/30d rolling windows) + 4-dimension segmentation
-   -> Predictive model: daily batch scoring -> churn probability per subscriber
-   -> Generative model: personalized retention message per flagged subscriber
-   -> Delivery (Email via Gmail SMTP, WhatsApp via Twilio API)
-   -> Feedback loop: outcomes (delivered / opened / retained / churned) feed monthly retraining""", language=None)
-
-    st.markdown("---")
-    st.markdown("#### Technology Stack")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Technology Stack**")
 
     stack = pd.DataFrame([
         {"Component": "Predictive Model", "Technology": "scikit-learn GradientBoostingClassifier (prod: XGBoost / LightGBM)"},
@@ -1037,8 +1007,9 @@ with tab4:
     ])
     st.dataframe(stack, use_container_width=True, hide_index=True)
 
-    st.markdown("---")
-    st.markdown("#### Next Steps for Production")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("**Next Steps for Production**")
     st.markdown(
         "1. **Data quality sprint** — unify legacy Ooredoo + Hutchison subscriber IDs\n"
         "2. **Recalibration** — retrain on real post-merger data (expect AUC 0.80-0.85 range)\n"
