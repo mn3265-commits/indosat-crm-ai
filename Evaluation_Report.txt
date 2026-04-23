@@ -1,0 +1,65 @@
+======================================================================
+INDOSAT CRM AI — PROTOTYPE MODEL EVALUATION
+======================================================================
+
+Dataset split:
+  Train:      2101 samples (21.9% churn rate)
+  Validation:  449 samples (21.8% churn rate)
+  Test:        450 samples (22.0% churn rate)
+
+======================================================================
+MODEL PERFORMANCE — TEST SET (held-out)
+======================================================================
+  AUC-ROC:              0.9798
+  Accuracy:             0.9356
+  Precision (churn):    0.8977
+  Recall (churn):       0.7980
+  F1-score (churn):     0.8449
+
+  Training time:        0.53 seconds
+  Inference (batch 450): 2.5 ms total
+  Per-sample latency:   0.006 ms/sample
+
+Confusion Matrix:
+              Predicted:
+              Retain   Churn
+  Actual Retain:  342       9
+  Actual Churn:    20      79
+
+Classification report:
+              precision    recall  f1-score   support
+
+      Retain       0.94      0.97      0.96       351
+       Churn       0.90      0.80      0.84        99
+
+    accuracy                           0.94       450
+   macro avg       0.92      0.89      0.90       450
+weighted avg       0.93      0.94      0.93       450
+
+Feature Importance Ranking:
+  1. Tenure               0.4994  ████████████████████████
+  2. Loyalty              0.1341  ██████
+  3. Top-up Days          0.1040  █████
+  4. Data Drop            0.0909  ████
+  5. Complaints           0.0694  ███
+  6. ARPU                 0.0674  ███
+  7. Network Quality      0.0301  █
+  8. Interest             0.0046  
+
+Risk Distribution (test set):
+  HIGH risk (>=70%):    80 (17.8%)
+  MEDIUM risk (40-70%): 14 (3.1%)
+  LOW risk (<40%):     356 (79.1%)
+
+======================================================================
+GO / NO-GO EVALUATION against targets:
+======================================================================
+  AUC-ROC >= 0.80:       0.9798   ✓ PASS
+  Recall >= 0.75:        0.7980   ✓ PASS
+  Precision >= 0.60:     0.8977   ✓ PASS
+  F1 >= 0.67:            0.8449   ✓ PASS
+  Latency < 5s/sample:   0.006ms  ✓ PASS (3 orders of magnitude below target)
+
+======================================================================
+RECOMMENDATION: GO
+======================================================================

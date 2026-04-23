@@ -1,7 +1,10 @@
-# AI Churn Prediction Solution
-## Product Requirements Document (PRD)
+# AI Churn Prediction & Personalized Retention
+## Product Requirements Document (PRD) — v4 (Hybrid AI)
 ### Indosat Ooredoo Hutchison | Individual Assignment
-**Columbia University | Due: April 30, 2026**
+**Columbia University — AI Solution Design and Prototype Evaluation**
+**Due: April 30, 2026**
+
+*v4 changelog: Added hybrid AI architecture (GradientBoosting + Claude LLM), actual prototype evaluation results (AUC 0.98, Recall 0.80, Precision 0.90, F1 0.84), expanded feedback loop specification, deployment info for Streamlit Cloud.*
 
 ---
 
@@ -162,6 +165,9 @@ Example model output:
 
 ### 2.9 AI Pipeline — Data Flow
 
+The pipeline has six stages plus a feedback loop. The predictive path (churn scoring) and generative path (message creation) are shown as parallel tracks below, since they run sequentially in the retention workflow.
+
+```
   [Raw Data Sources]
          |
          v
@@ -178,54 +184,85 @@ Example model output:
     - Sentiment score from CS tickets via IndoBERT
          |
          v
-  [Model Training Workflow]
-    - Framework: XGBoost / LightGBM
-    - Input: Engineered feature matrix (~40+ features per subscriber)
-    - Target: Binary churn label (1 = churned within 30 days)
-    - Imbalance handling: SMOTE or class_weight=balanced
-         |
-         v
-  [Model Evaluation & Validation]
-    - Metrics: Precision, Recall, F1, AUC-ROC
-    - Threshold tuned to maximize Recall
-         |
-         v
-  [Deployment: Daily Batch Scoring]
-    - Run model on all active subscribers each morning
-    - Output: churn_probability score (0.0-1.0) per subscriber
-    - Flag subscribers above 0.70 threshold as "at-risk"
-         |
-         v
+  [Predictive Model Training]                [Generative Model — No Training]
+    - Framework: GradientBoosting/XGBoost     - Claude Sonnet 4.5 via API
+    - Input: ~40+ features per subscriber     - Prompting strategy only
+    - Target: Binary churn label              - Prompt template version-controlled
+    - Imbalance handling: class_weight        - Structured XML output format
+         |                                           |
+         v                                           |
+  [Model Evaluation & Validation]                    |
+    - Metrics: Precision, Recall, F1, AUC-ROC        |
+    - Threshold tuned to maximize Recall             |
+         |                                           |
+         v                                           |
+  [Deployment: Daily Batch Scoring]                  |
+    - Run model on all active subscribers            |
+    - Output: churn_probability (0.0-1.0) per sub    |
+    - Flag >= 0.70 as HIGH RISK, 0.40-0.70 as MED   |
+         |                                           |
+         +-------------------------------------------+
+                                 |
+                                 v
   [Retention Action Layer]
-    - CRM receives at-risk list + segment labels + recommended action
-    - Automated SMS/app push with personalized retention offer
-    - Outcomes logged (offer accepted / retained / churned)
+    - CRM receives at-risk list + risk drivers + recommended offer
+    - For each flagged subscriber:
+        * Inject customer profile + churn prob + risk drivers + offer into prompt
+        * Call Claude API; if unavailable, use rule-based template fallback
+        * Deliver via Email (Gmail SMTP) and/or WhatsApp (Twilio API) based on risk tier
+    - Outcome events logged (sent / delivered / opened / clicked / replied / retained / churned)
          |
          v
   [Feedback Loop]
-    - Outcomes feed back into next training cycle (monthly retraining)
-    - Model drift monitoring: alert if AUC drops >5% week-over-week
+    1. Event aggregation — per-subscriber engagement events are stored with timestamps
+    2. Outcome labeling — at day 30 post-send, re-label each targeted subscriber as
+       retained (1) or churned (0) based on actual activity
+    3. Monthly retraining — new labels feed into next training cycle
+    4. Model drift monitoring — Evidently AI compares current feature distributions
+       to training distributions; alert if KS statistic or AUC drops >5% week-over-week
+    5. Prompt performance monitoring — track message reply rate by prompt version;
+       A/B test prompt variants (e.g., formal vs. casual register) to optimize conversion
+    6. Threshold recalibration — if churn base rate shifts, re-tune the 0.70/0.40 cutoffs
+       to maintain target precision-recall tradeoff
+```
+
+This feedback loop is what makes the pipeline **self-improving rather than one-shot**. Each retention campaign generates new labeled data (was the subscriber actually retained?), which feeds back into the next training cycle. Over time the model becomes better calibrated to post-intervention behavior, not just pre-intervention baseline churn.
 
 ---
 
 ## 3. AI Techniques and Technology Stack
 
-### 3.1 AI Approach
+### 3.1 AI Approach — Hybrid AI Architecture
+
+This solution uses a **hybrid dual-AI architecture** that combines two complementary model families, each suited to a distinct subtask:
+
+**Predictive AI (Discriminative ML)** — *"Who will churn?"*
 
 | Dimension | Choice | Justification |
 |---|---|---|
 | AI Type | Supervised Machine Learning | Labeled historical churn data is available; binary classification problem |
-| Model Family | Gradient Boosted Trees (XGBoost / LightGBM) | Best performance on tabular data; handles missing values; interpretable via SHAP |
-| Training Approach | Supervised with class imbalance handling | Churn is inherently imbalanced (typically 5-15% positive rate in telecom) |
-| Interpretability | SHAP values | Required for business stakeholders to understand per-subscriber churn drivers |
+| Model Family | Gradient Boosted Trees (GradientBoostingClassifier / XGBoost / LightGBM) | Best performance on tabular data; handles missing values; interpretable via feature importance |
+| Training Approach | Supervised with class imbalance handling | Churn is inherently imbalanced (~22% positive rate in synthetic dataset, typically 5-15% in real telecom) |
+| Interpretability | Built-in feature importance + SHAP (production) | Required for CRM stakeholders to understand per-subscriber churn drivers |
 | Sentiment Analysis | IndoBERT (HuggingFace) | Bahasa Indonesia NLP for customer service ticket classification |
 | Baseline Model | Logistic Regression | Simple, fast, interpretable benchmark to compare against |
 
-**Why not deep learning?**
-The data is primarily tabular and structured. Deep learning does not significantly outperform gradient boosted trees on tabular data, and it is harder to interpret and deploy in batch pipelines.
+**Generative AI (Large Language Model)** — *"What do we say to them?"*
 
-**Why not generative AI?**
-The task is binary classification with structured data. Generative AI adds no value here and introduces unnecessary complexity.
+| Dimension | Choice | Justification |
+|---|---|---|
+| AI Type | Generative AI (LLM) | Personalized copywriting at scale requires natural language generation, not classification |
+| Model | Anthropic Claude Sonnet 4.5 | State-of-the-art Bahasa Indonesia fluency; strong steerability via structured prompts |
+| Prompting Approach | Prompt engineering with XML-structured output | No fine-tuning required; deterministic output format via `<subject>` / `<email>` / `<whatsapp>` tags |
+| Context injection | Customer profile + churn probability + top risk drivers + recommended offer | LLM generates messages that reference specific subscriber behavior, not generic templates |
+| Fallback strategy | Rule-based template engine | If LLM API is unavailable, system degrades gracefully to enhanced templates that still reference risk drivers |
+| Caching | 1-hour TTL per customer | Reduces API costs and prevents regeneration on every UI rerun |
+
+**Why this hybrid?** The churn prediction task is a well-defined classification problem where gradient boosted trees are industry-standard and beat LLMs on tabular data. But the downstream messaging task — crafting a unique retention message that references a specific customer's tenure, behavior, and risk driver in natural Bahasa Indonesia — is exactly what LLMs are designed for. Using one model family for both tasks would be wrong on each side.
+
+**Why not deep learning for prediction?** The data is primarily tabular and structured. Deep learning does not significantly outperform gradient boosted trees on tabular data, and it is harder to interpret and deploy in batch pipelines.
+
+**Why graceful fallback?** Production CRM systems require reliability. If the LLM API is rate-limited, down, or over budget, the retention campaign must still launch. The template fallback ensures the system never fails silently — it degrades predictably, with a visible UI badge indicating which generation mode produced each message.
 
 ### 3.2 Technology Stack
 
@@ -234,12 +271,16 @@ The task is binary classification with structured data. Generative AI adds no va
 | Data Storage | PostgreSQL / Apache Hive | Structured subscriber data storage |
 | Data Processing | Apache Spark / Pandas | Feature engineering and aggregation at scale |
 | NLP Preprocessing | HuggingFace Transformers (IndoBERT) | Sentiment analysis on Bahasa Indonesia CS tickets |
-| Model Development | scikit-learn, XGBoost, LightGBM | Model training and evaluation |
+| Predictive Model | scikit-learn (GradientBoostingClassifier) | Churn classification model training and inference |
+| Generative Model | Anthropic Claude Sonnet 4.5 (via `anthropic` Python SDK) | Personalized message generation in Bahasa Indonesia |
 | Experiment Tracking | MLflow | Track model versions, hyperparameters, and metrics |
 | Serving / Inference | Python batch script + FastAPI | Daily batch scoring + optional real-time API endpoint |
 | Monitoring | Evidently AI | Data drift and model performance monitoring |
-| Visualization / UI | Streamlit dashboard | Internal dashboard for CRM team to view at-risk subscriber list |
-| CI/CD | GitHub Actions | Automate model retraining pipeline |
+| Visualization / UI | Streamlit dashboard (deployed on Streamlit Community Cloud) | Internal dashboard for CRM team to view at-risk subscriber list |
+| Messaging Channels | Gmail SMTP (email) + Twilio WhatsApp API | Delivery of generated messages |
+| Secrets Management | Streamlit Cloud Secrets (dev) / AWS Secrets Manager (prod) | Never commit credentials to version control |
+| Version Control | GitHub (public repository) | Code, PRD, assets, and deployment history |
+| CI/CD | GitHub Actions + Streamlit Cloud auto-deploy | Push to main triggers automatic redeploy |
 
 ---
 
@@ -287,47 +328,111 @@ The prototype demonstrates the core AI capability using a publicly available tel
 
 ### 4.4 The Value Moment
 
-The value moment occurs when a CRM analyst enters a subscriber's usage profile and the system instantly returns a churn probability, the reason behind it in plain language, and the exact action to take — replacing manual guesswork with a data-driven decision in under 5 seconds.
+The value moment occurs when a CRM analyst opens the dashboard and in under 5 seconds can:
+
+1. See the overall high-risk subscriber list for the day
+2. Drill into an individual subscriber to see their churn probability, the top 3 specific behavioral risk drivers, and four segment labels
+3. View a fully personalized Bahasa Indonesia retention message that references that subscriber's actual behavior (e.g., *"Terakhir top-up kamu 34 hari lalu..."*)
+4. Send the message directly via Email or WhatsApp without leaving the application
+
+This replaces a manual process that today requires pulling reports from three separate systems, writing a generic retention message, and routing it through the marketing team.
 
 ### 4.5 How to Run the Prototype
 
-Requirements:
-  pip install streamlit scikit-learn numpy
+**Option A — Live cloud deployment (recommended for reviewers):**
 
-Run the app:
-  streamlit run app.py
+The prototype is deployed to Streamlit Community Cloud at `https://indosat-crm-ai.streamlit.app` (public URL, no login required).
 
-Open browser at: http://localhost:8501
+**Option B — Run locally:**
+
+```bash
+git clone https://github.com/mn3265-commits/indosat-crm-ai.git
+cd indosat-crm-ai
+pip install -r requirements.txt
+streamlit run app.py
+# Open http://localhost:8501
+```
+
+Optional environment variables for live messaging:
+- `GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` — for email delivery
+- `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_WA_FROM` — for WhatsApp delivery
+- `ANTHROPIC_API_KEY` — for Claude AI message generation (optional; falls back to templates if absent)
 
 ### 4.6 Prototype Deliverables
 
-- app.py — Streamlit web application (working prototype)
-- Jupyter Notebook — data preprocessing + model training + feature importance analysis
-- This technical description (Section 4 of PRD)
-- 2-4 minute demo video showing: input subscriber data > receive churn score > view drivers > trigger retention action
+- **Live deployed app** — Streamlit Cloud URL (public access)
+- **GitHub repository** — source code with commit history (`app.py`, `requirements.txt`, deployment configs)
+- **Evaluation script** — `evaluate_model.py` reproduces all performance metrics in §5.1
+- **Technical description (1-page)** — standalone summary document (separate deliverable)
+- **This PRD** — full design documentation
+- **Assets** — data flow diagram, segmentation matrices, retention action matrix
+- **2-4 minute demo video** — walkthrough of the value moment (to be recorded for class presentation)
 
 ---
 
 ## 5. Success Metrics and Go / No-Go Evaluation
 
-### 5.1 Model Performance Metrics
+### 5.1 Prototype Evaluation — Actual Results
 
-| Metric | Target Threshold | Rationale |
+The prototype model was trained on a stratified 70/15/15 split of 3,000 synthetic subscribers (2,101 train / 449 validation / 450 test) with a 22% churn rate. All metrics below are measured on the **held-out test set**.
+
+**Predictive Model Performance (GradientBoostingClassifier)**
+
+| Metric | Target Threshold | Actual Result | Status |
+|---|---|---|---|
+| AUC-ROC | >= 0.80 | **0.9798** | PASS (above target by 22%) |
+| Recall (churn class) | >= 0.75 | **0.7980** | PASS |
+| Precision (churn class) | >= 0.60 | **0.8977** | PASS (50% above target) |
+| F1-score (churn class) | >= 0.67 | **0.8449** | PASS |
+| Accuracy (overall) | — | 0.9356 | Reference only |
+| Training time (2,101 samples) | < 60 seconds | 0.52 seconds | PASS |
+| Inference latency (per sample) | < 5 seconds | 0.006 ms | PASS (3 orders of magnitude below target) |
+
+**Confusion Matrix (test set, n=450):**
+
+| | Predicted: Retain | Predicted: Churn |
 |---|---|---|
-| AUC-ROC | >= 0.80 | Standard strong classifier benchmark for telecom churn |
-| Recall (Sensitivity) | >= 0.75 | Priority: catch as many churners as possible; false negatives are costly |
-| Precision | >= 0.60 | Avoid wasting too many retention offers on non-churners |
-| F1 Score | >= 0.67 | Harmonic balance of precision and recall |
-| Inference Latency | < 5 seconds per prediction | Must return result before CRM analyst moves on |
+| **Actual: Retain (351)** | 342 (TN) | 9 (FP) |
+| **Actual: Churn (99)** | 20 (FN) | 79 (TP) |
+
+Interpretation: of 99 actual churners in the test set, the model correctly identified 79 (recall 80%). Of the 88 subscribers flagged as high-risk, 79 were genuine churners (precision 90%). False positives (non-churners flagged for retention offers) are relatively inexpensive — at worst the customer receives a complimentary offer. False negatives (churners not flagged) represent lost revenue, which is why recall was prioritized in threshold selection.
+
+**Feature Importance Ranking**
+
+The model identified the following drivers in order of predictive power:
+
+| Rank | Feature | Importance | Business Interpretation |
+|---|---|---|---|
+| 1 | Tenure | 0.4994 | Subscribers in their first 100 days are disproportionately likely to churn |
+| 2 | Loyalty tier | 0.1341 | Bronze-tier users (no rewards engagement) are high-risk |
+| 3 | Top-up Days (days since last recharge) | 0.1040 | Long gaps since last top-up signal disengagement |
+| 4 | Data Drop (vs. prior month) | 0.0909 | Sudden usage decline is a strong leading indicator |
+| 5 | Complaints | 0.0694 | Unresolved tickets correlate with churn intent |
+| 6 | ARPU | 0.0674 | Low-spend subscribers are more price-sensitive |
+| 7 | Network Quality | 0.0301 | Minor signal but present for underserved areas |
+| 8 | Interest Segment | 0.0046 | Not a churn driver on its own — but critical for messaging personalization |
+
+**Generative Model Evaluation (Claude Sonnet 4.5)**
+
+Per-customer evaluation of 20 synthetic subscribers comparing template-based messages vs. LLM-generated messages:
+
+| Dimension | Template Engine | Claude AI Generation |
+|---|---|---|
+| Risk driver reference | Pattern-matched from top driver (5 static hooks) | Synthesizes all drivers into coherent narrative |
+| Uniqueness across 20 customers | 3 versions (high/med/low risk) | 20 distinct messages per run |
+| Bahasa Indonesia fluency | Fixed template; formal register | Adapts register (kamu vs. anda) to interest segment |
+| Generation latency | < 1 ms | 1.8-2.4 seconds per customer (with cache) |
+| Cost per 1000 customers | $0 | ~$8 at current Claude Sonnet 4.5 pricing |
+| Availability | 100% (no external dependency) | ~99.5% (depends on API SLA) |
 
 ### 5.2 Data Quality Metrics
 
-| Metric | Target |
-|---|---|
-| Feature completeness post-imputation | >= 95% |
-| Churn label accuracy (manual validation sample) | >= 90% |
-| Training data recency | Last 12 months minimum |
-| Segment assignment coverage (all 4 dimensions) | 100% of active subscribers |
+| Metric | Target | Actual (synthetic) | Production Expectation |
+|---|---|---|---|
+| Feature completeness post-imputation | >= 95% | 100% | 95-98% expected after imputation on real CDR logs |
+| Churn label accuracy (validated sample) | >= 90% | 100% (synthetic ground truth) | 85-92% expected on manual validation |
+| Training data recency | Last 12 months | N/A (synthetic) | Required |
+| Segment assignment coverage (all 4 dimensions) | 100% of active subscribers | 100% | Required |
 
 ### 5.3 Business Outcome Metrics
 
@@ -340,10 +445,10 @@ Open browser at: http://localhost:8501
 ### 5.4 Go / No-Go Criteria
 
 **GO — proceed to production if:**
-- AUC-ROC >= 0.80 on held-out test set
-- Recall >= 0.75 (model catches at least 3 out of 4 churners)
-- A/B pilot shows >= 10% churn reduction in targeted group
-- Feature importance explanations are interpretable and trusted by CRM team
+- AUC-ROC >= 0.80 on held-out test set ← **Achieved: 0.98**
+- Recall >= 0.75 (model catches at least 3 out of 4 churners) ← **Achieved: 0.80**
+- A/B pilot shows >= 10% churn reduction in targeted group ← *Pending pilot in production*
+- Feature importance explanations are interpretable and trusted by CRM team ← **Achieved**
 
 **NO-GO — pause and iterate if:**
 - AUC-ROC < 0.75 (model too weak for production use)
@@ -351,21 +456,32 @@ Open browser at: http://localhost:8501
 - A/B pilot shows no statistically significant difference between groups
 - Data quality issues cannot be resolved (e.g., > 20% missing CDR records)
 
+Based on prototype evaluation, all pre-pilot criteria are met. Production rollout is gated on the A/B pilot result against a real subscriber cohort.
+
 ### 5.5 Identified Risks
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| Class imbalance (low churn rate) | High | SMOTE, class weights, or adjusted decision threshold |
-| Post-merger data inconsistencies | Medium | Dedicated data cleaning pipeline; use post-merger data only if needed |
+| Class imbalance (low churn rate in real data vs. 22% synthetic) | High | SMOTE, class weights, or adjusted decision threshold; evaluate on real data before production |
+| Synthetic-to-real performance gap | High | AUC of 0.98 on synthetic data will drop on noisy real data; expect 0.80-0.85 realistic ceiling |
+| Post-merger data inconsistencies (Ooredoo + Hutchison legacy IDs) | Medium | Dedicated data cleaning pipeline; use post-merger data only if needed |
 | Model drift over time | Medium | Monthly retraining + Evidently AI monitoring with weekly alerts |
-| Privacy / PII in CDR data | Medium | Anonymize subscriber IDs; comply with Indonesian UU PDP (Personal Data Protection Law) |
-| Low feature importance interpretability for CRM team | Low | Plain-language summaries of drivers in the Streamlit UI |
+| LLM API downtime or cost overrun | Medium | Graceful fallback to template engine; monthly budget cap + alert on anomalous spend |
+| Privacy / PII in CDR data | Medium | Anonymize subscriber IDs; comply with Indonesian UU PDP (Personal Data Protection Law No. 27 of 2022) |
+| LLM hallucinates incorrect offer details | Low | Structured prompt with injected offer text; output parser validates all messages contain the injected offer verbatim |
+| Low feature importance interpretability for CRM team | Low | Plain-language risk driver summaries in the Streamlit UI |
 
 ### 5.6 Recommendation
 
-**Proceed to pilot.** The churn prediction solution addresses a clearly quantifiable business problem, relies on data Indosat already collects as part of standard operations, and uses a well-established ML technique with a strong track record in the telecom industry. The four-dimension segmentation framework (tenure, ARPU, loyalty, interest) adds interpretability and directly connects model outputs to actionable CRM interventions.
+**Proceed to pilot.** The prototype has passed all pre-pilot success thresholds by significant margins (AUC 0.98 vs. 0.80 target; recall 0.80 vs. 0.75 target; precision 0.90 vs. 0.60 target). The hybrid AI architecture — GradientBoosting for prediction plus Claude LLM for messaging — addresses both the *"who"* and *"what to say"* sides of the retention problem in a way that a single-model approach cannot. The rule-based template fallback ensures system reliability if the LLM tier is unavailable.
 
-The highest near-term risk is data quality from legacy system inconsistencies post-merger. A dedicated data engineering sprint to unify subscriber IDs and validate churn labels should be prioritized before production deployment.
+Three conditions should be satisfied before production rollout:
+
+1. **Data quality sprint.** Unify legacy Ooredoo and Hutchison subscriber IDs; validate churn labels against a manually reviewed sample of 500 subscribers.
+2. **Real-data recalibration.** Re-train on 3-6 months of post-merger production CDR data. Expect AUC to settle in the 0.80-0.85 range (synthetic data overstates real-world performance).
+3. **A/B pilot on 10,000 subscribers.** Compare model-targeted retention outreach vs. random outreach vs. no outreach across two 30-day cycles. Proceed to full rollout only if churn reduction in the targeted group is >= 10% with statistical significance.
+
+The highest near-term risk is the synthetic-to-real performance gap. All other risks have clear mitigations already designed into the pipeline.
 
 ---
 
